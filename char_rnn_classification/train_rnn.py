@@ -5,5 +5,6 @@ from char_rnn import data
 
 
 if __name__ == "__main__":
-    print(data.all_filenames())
+    train_data = data.read_data()
+    print("Read %d classes" % len(train_data))
     pass
