@@ -17,8 +17,8 @@ from char_rnn import plots
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--cuda", default=False, action='store_true', help="Enable cuda")
-    parser.add_argument("--epoches", default=10, help="Count of epoches to train")
-    parser.add_argument("--test", default=0.2, help="Ratio of train samples to be used for test. Default=0.2")
+    parser.add_argument("--epoches", default=10, type=int, help="Count of epoches to train")
+    parser.add_argument("--test", default=0.2, type=float, help="Ratio of train samples to be used for test. Default=0.2")
     parser.add_argument("--plot", help="Generate html page with plots")
     parser.add_argument("--save", help="Save model after training to this file")
     parser.add_argument("--lr-decay", type=float, help="Float multiplier to decay LR. If not specified (default), do not decay")
@@ -64,7 +64,7 @@ if __name__ == "__main__":
             loss_sum += loss.data[0]
         loss_sum /= len(train_data)
         test_loss = model.test_model(rnn, test_data, cuda=args.cuda)
-        print("%d: loss=%.5f, test_loss=%.5f" % (epoch, loss_sum, test_loss))
+        print("%d: loss=%.5f, test_loss=%.5f, lr=%.5f" % (epoch, loss_sum, test_loss, lr))
         train_losses.append((epoch, loss_sum))
         test_losses.append((epoch, test_loss))
         if args.lr_decay is not None:
