@@ -4,6 +4,9 @@ import unicodedata
 import string
 
 
+ALL_ASCII_LETTERS = string.ascii_letters + " .,;'"
+
+
 def all_filenames(data_dir="data"):
     return glob.glob(os.path.join(data_dir, "*.txt"))
 
@@ -28,7 +31,7 @@ def name_to_ascii(name):
     return ''.join(
         c for c in unicodedata.normalize('NFD', name)
         if unicodedata.category(c) != 'Mn'
-        and (c in string.ascii_letters or c in " .,;'")
+        and c in ALL_ASCII_LETTERS
     )
 
 
@@ -55,5 +58,3 @@ def read_files(files, normalize_names=True):
 
 def read_data(normalize_names=True):
     return read_files(all_filenames(), normalize_names=normalize_names)
-
-pass
