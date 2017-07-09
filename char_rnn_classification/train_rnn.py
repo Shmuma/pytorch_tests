@@ -21,6 +21,7 @@ if __name__ == "__main__":
     parser.add_argument("--test", default=0.2, help="Ratio of train samples to be used for test. Default=0.2")
     parser.add_argument("--plot", help="Generate html page with plots")
     parser.add_argument("--save", help="Save model after training to this file")
+    parser.add_argument("--lr-decay", type=float, help="Float multiplier to decay LR. If not specified (default), do not decay")
     args = parser.parse_args()
 
     data_dict = data.read_data()
@@ -34,11 +35,13 @@ if __name__ == "__main__":
     if args.cuda:
         rnn = rnn.cuda()
     opt_target = nn.NLLLoss()
-    optimizer = optim.SGD(rnn.parameters(), lr=0.005)
+    lr = 0.005
+    optimizer = optim.SGD(rnn.parameters(), lr=lr)
 
     loss_sum = 0.0
     train_losses = []
     test_losses = []
+    lr_values = []
 
     for epoch in tqdm(range(args.epoches)):
         random.shuffle(train_data)
@@ -64,9 +67,14 @@ if __name__ == "__main__":
         print("%d: loss=%.5f, test_loss=%.5f" % (epoch, loss_sum, test_loss))
         train_losses.append((epoch, loss_sum))
         test_losses.append((epoch, test_loss))
+        if args.lr_decay is not None:
+            lr *= args.lr_decay
+            optimizer = optim.SGD(rnn.parameters(), lr=lr)
+        lr_values.append((epoch, lr))
+
         loss_sum = 0.0
         if args.plot is not None:
-            plots.plot_data(train_losses, test_losses, args.plot)
+            plots.plot_data(train_losses, test_losses, lr_values, args.plot)
     if args.save is not None:
         torch.save(rnn.state_dict(), args.save)
     pass
