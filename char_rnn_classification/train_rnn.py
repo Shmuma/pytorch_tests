@@ -37,7 +37,8 @@ if __name__ == "__main__":
     optimizer = optim.SGD(rnn.parameters(), lr=0.005)
 
     loss_sum = 0.0
-    losses = []
+    train_losses = []
+    test_losses = []
 
     for epoch in tqdm(range(args.epoches)):
         random.shuffle(train_data)
@@ -59,11 +60,13 @@ if __name__ == "__main__":
 
             loss_sum += loss.data[0]
         loss_sum /= len(train_data)
-        print("%d: loss=%.5f" % (epoch, loss_sum))
-        losses.append((epoch, loss_sum))
+        test_loss = model.test_model(rnn, test_data, cuda=args.cuda)
+        print("%d: loss=%.5f, test_loss=%.5f" % (epoch, loss_sum, test_loss))
+        train_losses.append((epoch, loss_sum))
+        test_losses.append((epoch, test_loss))
         loss_sum = 0.0
         if args.plot is not None:
-            plots.plot_data(losses, args.plot)
+            plots.plot_data(train_losses, test_losses, args.plot)
     if args.save is not None:
         torch.save(rnn.state_dict(), args.save)
     pass
