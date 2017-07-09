@@ -3,6 +3,8 @@
 import argparse
 
 from tqdm import tqdm
+
+import torch
 from torch import nn
 from torch import optim
 
@@ -11,12 +13,12 @@ from char_rnn import model
 from char_rnn import plots
 
 
-EPOCHES = 10
-
-
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--cuda", default=False, action='store_true', help="Enable cuda")
+    parser.add_argument("--epoches", default=10, help="Count of epoches to train")
+    parser.add_argument("--plot", help="Generate html page with plots")
+    parser.add_argument("--save", help="Save model after training to this file")
     args = parser.parse_args()
 
     train_data = data.read_data()
@@ -34,7 +36,7 @@ if __name__ == "__main__":
     loss_sum = 0.0
     losses = []
 
-    for epoch in tqdm(range(EPOCHES)):
+    for epoch in tqdm(range(args.epoches)):
         for _ in range(epoch_size):
             rnn.zero_grad()
             v_output = v_hidden = rnn.new_hidden()
@@ -56,5 +58,8 @@ if __name__ == "__main__":
         print("%d: loss=%.5f" % (epoch, loss_sum))
         losses.append((epoch, loss_sum))
         loss_sum = 0.0
-        plots.plot_data(losses, "rnn.html")
+        if args.plot is not None:
+            plots.plot_data(losses, args.plot)
+    if args.save is not None:
+        torch.save(rnn.state_dict(), args.save)
     pass

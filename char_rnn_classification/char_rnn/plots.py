@@ -7,7 +7,7 @@ def plot_data(loss_pairs, file_name):
     f = figure()
     f.title.text = "Loss"
     f.plot_width = 1200
-    f.plot_height = 300
+    f.plot_height = 600
 
     x, y = zip(*loss_pairs)
     f.line(x, y, color='blue')
