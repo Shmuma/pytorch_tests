@@ -1,4 +1,5 @@
 import glob
+import random
 import os.path
 import unicodedata
 import string
@@ -58,3 +59,27 @@ def read_files(files, normalize_names=True):
 
 def read_data(normalize_names=True):
     return read_files(all_filenames(), normalize_names=normalize_names)
+
+
+def prepare_train_test(class_names, data_dict, test_ratio):
+    """
+    Convert data dictionary in form class -> [samples] to train/test list of (name, class_idx) samples
+    :param class_names: list of class names 
+    :param data_dict: data dict 
+    :param test_ratio: float to use split data into train/test
+    :return: tuple of lists
+    """
+    assert isinstance(class_names, list)
+    assert isinstance(data_dict, dict)
+    assert isinstance(test_ratio, float)
+
+    class_map = {name: idx for idx, name in enumerate(class_names)}
+
+    data = [
+        (name, class_map[class_name])
+        for class_name in class_names
+        for name in data_dict[class_name]
+    ]
+    random.shuffle(data)
+    test_len = int(len(data) * test_ratio)
+    return data[:-test_len], data[-test_len:]

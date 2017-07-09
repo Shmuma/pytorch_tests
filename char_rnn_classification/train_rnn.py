@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # Reimplementation of tutorial from https://github.com/spro/practical-pytorch/tree/master/char-rnn-classification
 import argparse
+import random
 
 from tqdm import tqdm
 
@@ -17,17 +18,19 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--cuda", default=False, action='store_true', help="Enable cuda")
     parser.add_argument("--epoches", default=10, help="Count of epoches to train")
+    parser.add_argument("--test", default=0.2, help="Ratio of train samples to be used for test. Default=0.2")
     parser.add_argument("--plot", help="Generate html page with plots")
     parser.add_argument("--save", help="Save model after training to this file")
     args = parser.parse_args()
 
-    train_data = data.read_data()
-    epoch_size = sum(map(len, train_data.values()))
-    print("Read %d classes, total samples %d" % (len(train_data), epoch_size))
+    data_dict = data.read_data()
+    classes = list(sorted(data_dict.keys()))
+    train_data, test_data = data.prepare_train_test(classes, data_dict, test_ratio=args.test)
 
-    classes = list(sorted(train_data.keys()))
+    print("Read %d classes, we have %d train samples and %d test samples" % (len(data_dict), len(train_data),
+                                                                             len(test_data)))
 
-    rnn = model.RNN(input_size=model.INPUT_SIZE, hidden_size=100, output_size=len(train_data))
+    rnn = model.RNN(input_size=model.INPUT_SIZE, hidden_size=100, output_size=len(data_dict))
     if args.cuda:
         rnn = rnn.cuda()
     opt_target = nn.NLLLoss()
@@ -37,11 +40,12 @@ if __name__ == "__main__":
     losses = []
 
     for epoch in tqdm(range(args.epoches)):
-        for _ in range(epoch_size):
+        random.shuffle(train_data)
+        for name, class_idx in train_data:
             rnn.zero_grad()
             v_output = v_hidden = rnn.new_hidden()
 
-            sample_class, sample_name, v_class, v_name = model.random_sample(classes, train_data)
+            v_name, v_class = model.convert_sample(name, class_idx)
             if args.cuda:
                 v_class = v_class.cuda()
                 v_name = v_name.cuda()
@@ -54,7 +58,7 @@ if __name__ == "__main__":
             optimizer.step()
 
             loss_sum += loss.data[0]
-        loss_sum /= epoch_size
+        loss_sum /= len(train_data)
         print("%d: loss=%.5f" % (epoch, loss_sum))
         losses.append((epoch, loss_sum))
         loss_sum = 0.0

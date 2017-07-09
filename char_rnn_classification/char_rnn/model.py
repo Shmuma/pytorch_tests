@@ -58,4 +58,11 @@ def random_sample(classes, data_dict):
     return rand_class, name, v_class, v_name
 
 
+def convert_sample(name, class_idx):
+    assert isinstance(name, str)
+    assert isinstance(class_idx, int)
+    v_name = Variable(name_to_tensor(name))
+    v_class = Variable(torch.LongTensor([class_idx]))
+    return v_name, v_class
+
 pass
