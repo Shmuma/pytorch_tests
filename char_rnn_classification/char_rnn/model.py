@@ -40,6 +40,28 @@ class RNN(nn.Module):
         return Variable(torch.zeros(1, self.hidden_size))
 
 
+class LibRNN(nn.Module):
+    def __init__(self, input_size, hidden_size, output_size):
+        super(LibRNN, self).__init__()
+
+        self.input_size = input_size
+        self.hidden_size = hidden_size
+        self.output_size = output_size
+
+        self.rnn = nn.RNN(input_size, hidden_size)
+        self.out = nn.Linear(hidden_size, output_size)
+        self.softmax = nn.LogSoftmax()
+
+    def forward(self, x_input, hidden):
+        output, hidden = self.rnn.forward(x_input, hidden)
+        output = self.out(output.view(-1, self.hidden_size))
+        output = self.softmax(output)
+        return output, hidden
+
+    def new_hidden(self):
+        return None
+
+
 def class_from_output(output):
     assert isinstance(output, Variable)
     top_v, top_i = output.data.topk(1)
@@ -71,7 +93,7 @@ def test_model(model, test_data, cuda=False):
     Perform test on test dataset and return mean log loss
     :param model: rnn model to test
     :param test_data: list of test samples (name, class_idx)
-    :return: 
+    :return:
     """
     assert isinstance(model, RNN)
     loss = 0.0
