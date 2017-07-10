@@ -8,6 +8,7 @@ from tqdm import tqdm
 import torch
 from torch import nn
 from torch import optim
+from torch.autograd import Variable
 
 from char_rnn import data
 from char_rnn import model
@@ -31,7 +32,8 @@ if __name__ == "__main__":
     print("Read %d classes, we have %d train samples and %d test samples" % (len(data_dict), len(train_data),
                                                                              len(test_data)))
 
-    rnn = model.RNN(input_size=model.INPUT_SIZE, hidden_size=100, output_size=len(data_dict))
+    #rnn = model.RNN(input_size=model.INPUT_SIZE, hidden_size=100, output_size=len(data_dict))
+    rnn = torch.nn.RNN(input_size=model.INPUT_SIZE, hidden_size=100)
     if args.cuda:
         rnn = rnn.cuda()
     opt_target = nn.NLLLoss()
@@ -47,16 +49,18 @@ if __name__ == "__main__":
         random.shuffle(train_data)
         for name, class_idx in train_data:
             rnn.zero_grad()
-            v_output = v_hidden = rnn.new_hidden()
 
+            v_output = None
+            v_hidden = Variable(torch.zeros((1, model.INPUT_SIZE)))
             v_name, v_class = model.convert_sample(name, class_idx)
             if args.cuda:
                 v_class = v_class.cuda()
                 v_name = v_name.cuda()
-                v_hidden = v_hidden.cuda()
 
             for v_char in v_name:
-                v_output, v_hidden = rnn.forward(v_char, v_hidden)
+                v_char = v_char.unsqueeze(0)
+                print(v_char.size())
+                v_output, v_hidden = rnn.forward(v_char, hx=v_hidden)
             loss = opt_target(v_output, v_class)
             loss.backward()
             optimizer.step()
