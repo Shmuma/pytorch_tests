@@ -53,7 +53,7 @@ class LibRNN(nn.Module):
         self.softmax = nn.LogSoftmax()
 
     def forward(self, x_input, hidden):
-        output, hidden = self.rnn.forward(x_input.unsqueeze(0), hidden)
+        output, hidden = self.rnn.forward(x_input, hidden)
         output = self.out(output.view(-1, self.hidden_size))
         output = self.softmax(output)
         return output, hidden
@@ -106,8 +106,8 @@ def test_model(model, test_data, cuda=False):
             v_hidden = v_hidden.cuda()
             v_name = v_name.cuda()
             v_class = v_class.cuda()
-        for v_char in v_name:
-            v_output, v_hidden = model.forward(v_char, v_hidden)
+        for char_idx in range(v_name.size()[0]):
+            v_output, v_hidden = model.forward(v_name[char_idx:char_idx+1], v_hidden)
         loss += nll_loss(v_output, v_class).data.numpy()[0]
     return loss / len(test_data)
 

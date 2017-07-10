@@ -56,8 +56,8 @@ if __name__ == "__main__":
                 v_class = v_class.cuda()
                 v_name = v_name.cuda()
 
-            for v_char in v_name:
-                v_output, v_hidden = rnn.forward(v_char, v_hidden)
+            for char_idx in range(v_name.size()[0]):
+                v_output, v_hidden = rnn.forward(v_name[char_idx:char_idx+1], v_hidden)
             loss = opt_target(v_output, v_class)
             loss.backward()
             optimizer.step()
