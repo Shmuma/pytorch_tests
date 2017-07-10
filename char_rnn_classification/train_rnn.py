@@ -57,7 +57,6 @@ if __name__ == "__main__":
                 v_name = v_name.cuda()
 
             for v_char in v_name:
-                v_char = v_char.unsqueeze(0)
                 v_output, v_hidden = rnn.forward(v_char, v_hidden)
             loss = opt_target(v_output, v_class)
             loss.backward()

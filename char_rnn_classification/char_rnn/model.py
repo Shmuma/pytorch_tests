@@ -53,7 +53,7 @@ class LibRNN(nn.Module):
         self.softmax = nn.LogSoftmax()
 
     def forward(self, x_input, hidden):
-        output, hidden = self.rnn.forward(x_input, hidden)
+        output, hidden = self.rnn.forward(x_input.unsqueeze(0), hidden)
         output = self.out(output.view(-1, self.hidden_size))
         output = self.softmax(output)
         return output, hidden
@@ -95,7 +95,6 @@ def test_model(model, test_data, cuda=False):
     :param test_data: list of test samples (name, class_idx)
     :return:
     """
-    assert isinstance(model, RNN)
     loss = 0.0
     nll_loss = nn.NLLLoss()
 
