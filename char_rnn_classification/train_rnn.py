@@ -15,6 +15,9 @@ from char_rnn import model
 from char_rnn import plots
 
 
+BATCH_SIZE = 4
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--cuda", default=False, action='store_true', help="Enable cuda")
@@ -47,11 +50,22 @@ if __name__ == "__main__":
 
     for epoch in tqdm(range(args.epoches)):
         random.shuffle(train_data)
-        for name, class_idx in train_data:
+        batch_ofs = 0
+        while batch_ofs < len(train_data):
+            batch = train_data[batch_ofs:batch_ofs+BATCH_SIZE]
+            names, classes = zip(*batch)
             rnn.zero_grad()
 
-            v_output = v_hidden = rnn.new_hidden()
-            v_name, v_class = model.convert_sample(name, class_idx)
+            v_output = v_hidden = None
+            names_offset = 0
+            while True:
+                samples = model.convert_samples(names, names_offset, classes)
+                if samples is None:
+                    break
+
+
+
+            #v_name, v_class = model.convert_sample(name, class_idx)
             if args.cuda:
                 v_class = v_class.cuda()
                 v_name = v_name.cuda()
