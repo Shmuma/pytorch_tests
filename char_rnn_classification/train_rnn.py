@@ -19,6 +19,7 @@ BATCH_SIZE = 4
 
 
 if __name__ == "__main__":
+    random.seed(1234)
     parser = argparse.ArgumentParser()
     parser.add_argument("--cuda", default=False, action='store_true', help="Enable cuda")
     parser.add_argument("--epoches", default=10, type=int, help="Count of epoches to train")
@@ -51,34 +52,20 @@ if __name__ == "__main__":
     for epoch in tqdm(range(args.epoches)):
         random.shuffle(train_data)
         batch_ofs = 0
-        while batch_ofs < len(train_data):
-            batch = train_data[batch_ofs:batch_ofs+BATCH_SIZE]
-            names, classes = zip(*batch)
+        while batch_ofs < len(train_data)//BATCH_SIZE:
             rnn.zero_grad()
+            batch = train_data[batch_ofs*BATCH_SIZE:(batch_ofs+1)*BATCH_SIZE]
+            packed_samples, classes = model.convert_batch(batch)
 
-            v_output = v_hidden = None
-            names_offset = 0
-            while True:
-                samples = model.convert_samples(names, names_offset, classes)
-                if samples is None:
-                    break
-
-
-
-            #v_name, v_class = model.convert_sample(name, class_idx)
-            if args.cuda:
-                v_class = v_class.cuda()
-                v_name = v_name.cuda()
-
-            for char_idx in range(v_name.size()[0]):
-                v_output, v_hidden = rnn.forward(v_name[char_idx:char_idx+1], v_hidden)
-            loss = opt_target(v_output, v_class)
+            v_output, _ = rnn.forward(packed_samples, None)
+            loss = opt_target(v_output, classes)
             loss.backward()
             optimizer.step()
 
             loss_sum += loss.data[0]
-        loss_sum /= len(train_data)
-        test_loss = model.test_model(rnn, test_data, cuda=args.cuda)
+            batch_ofs += 1
+        loss_sum /= batch_ofs
+        test_loss = 0.0#model.test_model(rnn, test_data, cuda=args.cuda)
         print("%d: loss=%.5f, test_loss=%.5f, lr=%.5f" % (epoch, loss_sum, test_loss, lr))
         train_losses.append((epoch, loss_sum))
         test_losses.append((epoch, test_loss))

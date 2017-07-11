@@ -1,12 +1,15 @@
 import random
+import numpy as np
 
 import torch
 import torch.nn as nn
+import torch.nn.utils.rnn as rnn_utils
 from torch.autograd import Variable
 
 from . import data
 
 INPUT_SIZE = len(data.ALL_ASCII_LETTERS)
+LETTERS_INDICES = {c: idx for idx, c in enumerate(data.ALL_ASCII_LETTERS)}
 
 
 def char_to_tensor(chr):
@@ -60,10 +63,10 @@ class LibRNN(nn.Module):
         self.softmax = nn.LogSoftmax()
 
     def forward(self, x_input, hidden):
-        output, hidden = self.rnn.forward(x_input, hidden)
-        output = self.out(output.view(-1, self.hidden_size))
-        output = self.softmax(output)
-        return output, hidden
+        output, out_hidden = self.rnn.forward(x_input, hidden)
+        v_output = self.out(out_hidden[0])
+        v_output = self.softmax(v_output)
+        return v_output, out_hidden
 
     def new_hidden(self):
         return None
@@ -103,31 +106,44 @@ def convert_sample(name, class_idx):
     return v_name, v_class
 
 
-def convert_samples(names, offset, class_indices):
+def convert_batch(batch):
     """
-    Convert batch of samples at given offset into train data ready to be fed to RNN
-    :param names: list of names 
-    :param offset: offset within every name
-    :param classes_indices: list of class indices 
-    :return: None if offset is beyond every name, or tuple (v_names, v_classes, hidden_slice)
+    Convert batch of samples (list of (name, class_idx)) to form ready to train
+    :param batch: batch of samples
+    :return: tuple of (packed_sequence, classes_idx)
     """
-    res_chars = []
-    res_slice = []
-    res_classes = []
-    for idx, name in enumerate(names):
-        if offset >= len(name):
-            continue
-        res_slice.append(idx)
-        res_chars.append(char_to_tensor(name[offset]))
-        res_classes.append(class_indices[idx])
+    # sort batch according to cudnn RNN requirements
+    batch.sort(key=lambda t: len(t[0]), reverse=True)
+    names, classes = zip(*batch)
 
-    # we've reached the end of the sequence
-    if not res_classes:
-        return None
+    lengths = list(map(len, names))
+    # create padded tensor with names encoding
+    padded_batch = torch.zeros(len(batch), lengths[0], INPUT_SIZE)
+    for name_idx, name in enumerate(names):
+        for char_idx, c in enumerate(name):
+            idx = LETTERS_INDICES[c]
+            padded_batch[name_idx][char_idx][idx] = 1.0
 
-    v_classes = Variable(torch.LongTensor(res_classes))
-    v_names = Variable(torch.stack(res_chars))
-    print(v_names.size())
+    packed_seq = rnn_utils.pack_padded_sequence(Variable(padded_batch), lengths, batch_first=True)
+
+    return packed_seq, Variable(torch.LongTensor(classes))
+
+
+def convert_output(rnn_output):
+    """
+    Unpack packed sequence from RNN back into tensor with neurons' outputs
+    :param rnn_output: PackedSequence
+    :return:
+    """
+    assert isinstance(rnn_output, rnn_utils.PackedSequence)
+
+    v_padded, lengths = rnn_utils.pad_packed_sequence(rnn_output, batch_first=True)
+    # TODO: have no idea how to make it using slices/indexing :(
+    res = []
+    for idx, l in enumerate(lengths):
+        res.append(v_padded[idx][l-1])
+#    print(res[0])
+    return torch.stack(res)
 
 
 def test_model(model, test_data, cuda=False):
