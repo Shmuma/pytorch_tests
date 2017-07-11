@@ -25,6 +25,8 @@ if __name__ == "__main__":
     parser.add_argument("--test", default=0.2, type=float, help="Ratio of train samples to be used for test. Default=0.2")
     parser.add_argument("--plot", help="Generate html page with plots")
     parser.add_argument("--save", help="Save model after training to this file")
+    parser.add_argument("--batch", type=int, default=BATCH_SIZE, help="Batch size, default=%d" % BATCH_SIZE)
+    parser.add_argument("--lr", type=float, default=0.005, help="Initial learning rate, default=0.005")
     parser.add_argument("--lr-decay", type=float, help="Float multiplier to decay LR. If not specified (default), do not decay")
     args = parser.parse_args()
 
@@ -40,7 +42,7 @@ if __name__ == "__main__":
     if args.cuda:
         rnn = rnn.cuda()
     opt_target = nn.NLLLoss()
-    lr = 0.005
+    lr = args.lr
     optimizer = optim.SGD(rnn.parameters(), lr=lr)
 
     loss_sum = 0.0
@@ -51,9 +53,9 @@ if __name__ == "__main__":
     for epoch in tqdm(range(args.epoches)):
         random.shuffle(train_data)
         batch_ofs = 0
-        while batch_ofs < len(train_data)//BATCH_SIZE:
+        while batch_ofs < len(train_data)//args.batch_size:
             rnn.zero_grad()
-            batch = train_data[batch_ofs*BATCH_SIZE:(batch_ofs+1)*BATCH_SIZE]
+            batch = train_data[batch_ofs*args.batch_size:(batch_ofs+1)*args.batch_size]
             packed_samples, classes = model.convert_batch(batch, cuda=args.cuda)
             v_output, _ = rnn.forward(packed_samples, None)
             loss = opt_target(v_output, classes)
