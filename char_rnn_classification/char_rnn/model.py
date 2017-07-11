@@ -106,7 +106,7 @@ def convert_sample(name, class_idx):
     return v_name, v_class
 
 
-def convert_batch(batch):
+def convert_batch(batch, cuda=False):
     """
     Convert batch of samples (list of (name, class_idx)) to form ready to train
     :param batch: batch of samples
@@ -124,9 +124,14 @@ def convert_batch(batch):
             idx = LETTERS_INDICES[c]
             padded_batch[name_idx][char_idx][idx] = 1.0
 
-    packed_seq = rnn_utils.pack_padded_sequence(Variable(padded_batch), lengths, batch_first=True)
+    v_data = Variable(padded_batch)
+    v_classes = Variable(torch.LongTensor(classes))
+    if cuda:
+        v_data = v_data.cuda()
+        v_classes = v_classes.cuda()
+    packed_seq = rnn_utils.pack_padded_sequence(v_data, lengths, batch_first=True)
 
-    return packed_seq, Variable(torch.LongTensor(classes))
+    return packed_seq, v_classes
 
 
 def convert_output(rnn_output):
@@ -156,17 +161,10 @@ def test_model(model, test_data, cuda=False):
     loss = 0.0
     nll_loss = nn.NLLLoss()
 
-    for name, class_idx in test_data:
-        v_output = None
-        v_hidden = model.new_hidden()
-        v_name, v_class = convert_sample(name, class_idx)
-        if cuda:
-            v_hidden = v_hidden.cuda()
-            v_name = v_name.cuda()
-            v_class = v_class.cuda()
-        for char_idx in range(v_name.size()[0]):
-            v_output, v_hidden = model.forward(v_name[char_idx:char_idx+1], v_hidden)
-        loss += nll_loss(v_output, v_class).data.numpy()[0]
+    for entry in test_data:
+        packed_sample, classes = convert_batch([entry], cuda=cuda)
+        v_output, _ = model.forward(packed_sample, None)
+        loss += nll_loss(v_output, classes).data.cpu().numpy()[0]
     return loss / len(test_data)
 
 pass

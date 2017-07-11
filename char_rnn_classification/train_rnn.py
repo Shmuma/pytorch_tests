@@ -15,7 +15,7 @@ from char_rnn import model
 from char_rnn import plots
 
 
-BATCH_SIZE = 4
+BATCH_SIZE = 16
 
 
 if __name__ == "__main__":
@@ -55,8 +55,7 @@ if __name__ == "__main__":
         while batch_ofs < len(train_data)//BATCH_SIZE:
             rnn.zero_grad()
             batch = train_data[batch_ofs*BATCH_SIZE:(batch_ofs+1)*BATCH_SIZE]
-            packed_samples, classes = model.convert_batch(batch)
-
+            packed_samples, classes = model.convert_batch(batch, cuda=args.cuda)
             v_output, _ = rnn.forward(packed_samples, None)
             loss = opt_target(v_output, classes)
             loss.backward()
@@ -65,7 +64,7 @@ if __name__ == "__main__":
             loss_sum += loss.data[0]
             batch_ofs += 1
         loss_sum /= batch_ofs
-        test_loss = 0.0#model.test_model(rnn, test_data, cuda=args.cuda)
+        test_loss = model.test_model(rnn, test_data, cuda=args.cuda)
         print("%d: loss=%.5f, test_loss=%.5f, lr=%.5f" % (epoch, loss_sum, test_loss, lr))
         train_losses.append((epoch, loss_sum))
         test_losses.append((epoch, test_loss))
