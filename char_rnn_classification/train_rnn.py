@@ -53,9 +53,9 @@ if __name__ == "__main__":
     for epoch in tqdm(range(args.epoches)):
         random.shuffle(train_data)
         batch_ofs = 0
-        while batch_ofs < len(train_data)//args.batch_size:
+        while batch_ofs < len(train_data)//args.batch:
             rnn.zero_grad()
-            batch = train_data[batch_ofs*args.batch_size:(batch_ofs+1)*args.batch_size]
+            batch = train_data[batch_ofs*args.batch:(batch_ofs+1)*args.batch]
             packed_samples, classes = model.convert_batch(batch, cuda=args.cuda)
             v_output, _ = rnn.forward(packed_samples, None)
             loss = opt_target(v_output, classes)
