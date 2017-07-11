@@ -1,5 +1,5 @@
 from bokeh.plotting import figure
-from bokeh.layouts import column
+from bokeh.layouts import column, row
 from bokeh.io import output_file, save
 from bokeh.models import ColumnDataSource
 from bokeh.models.widgets import DataTable, TableColumn, NumberFormatter
@@ -9,8 +9,8 @@ def plot_data(train_loss, test_loss, lr_values, file_name):
     output_file(file_name)
     f = figure()
     f.title.text = "Loss"
-    f.plot_width = 1200
-    f.plot_height = 600
+    f.plot_width = 640
+    f.plot_height = 480
 
     epoches, train_losses = zip(*train_loss)
     _, test_losses = zip(*test_loss)
@@ -23,11 +23,10 @@ def plot_data(train_loss, test_loss, lr_values, file_name):
 
     f_lr = figure()
     f_lr.title.text = "Learning rate"
-    f_lr.plot_width = 1200
-    f_lr.plot_height = 600
+    f_lr.plot_width = 640
+    f_lr.plot_height = 480
     f_lr.line(epoches, learning_rates, color='blue', legend="LR", line_width=2)
     f_lr.xaxis.axis_label = "Epoch"
-
 
     # table with data
     source = ColumnDataSource({
@@ -46,4 +45,4 @@ def plot_data(train_loss, test_loss, lr_values, file_name):
 
     data_table = DataTable(source=source, columns=columns, width=1200, height=600)
 
-    save(column(data_table, f, f_lr))
+    save(column(row(f, f_lr), data_table))
