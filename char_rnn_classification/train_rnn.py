@@ -8,7 +8,6 @@ from tqdm import tqdm
 import torch
 from torch import nn
 from torch import optim
-from torch.autograd import Variable
 
 from char_rnn import data
 from char_rnn import model
