@@ -33,14 +33,14 @@ if __name__ == "__main__":
     if args.cuda:
         net = net.cuda()
     objective = nn.CrossEntropyLoss()
-    optimizer = optim.Adagrad(net.parameters(), lr=0.001)
+    optimizer = optim.Adagrad(net.parameters(), lr=0.01)
 
     for epoch in range(EPOCHES):
         losses = []
         start_ts = time.time()
 
         for batch in input.iterate_batches(data, BATCH_SIZE):
-            optimizer.zero_grad()
+            net.zero_grad()
             packed_seq, true_indices = input.batch_to_train(batch, input_encoder, cuda=args.cuda)
             out = net.forward(packed_seq)
             v_loss = objective(out, true_indices)
