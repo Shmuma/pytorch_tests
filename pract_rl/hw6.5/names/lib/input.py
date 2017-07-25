@@ -1,3 +1,4 @@
+import random
 import numpy as np
 
 TRAIN_FILE = "names"
@@ -30,3 +31,23 @@ class InputEncoder:
             res[sample_idx][idx] = 1.0
 
         return res
+
+
+def iterate_batches(data, batch_size, shuffle=True):
+    """
+    Iterate over batches of data, last batch can be incomplete
+    :param data: list of data samples 
+    :param batch_size: length of batch to sample 
+    :param shuffle: do we need to shuffle data before iteration
+    :return: yields data in chunks 
+    """
+    assert isinstance(data, list)
+    assert isinstance(batch_size, int)
+
+    if shuffle:
+        random.shuffle(data)
+    ofs = 0
+    while ofs*batch_size < len(data):
+        yield data[ofs*batch_size:(ofs+1)*batch_size]
+        ofs += 1
+

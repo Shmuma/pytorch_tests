@@ -3,7 +3,7 @@ import unittest
 from lib import input
 
 
-class TestEncoder(unittest.TestCase):
+class TestData(unittest.TestCase):
     def test_simple(self):
         enc = input.InputEncoder(['abc'])
         self.assertEqual(5, len(enc))       # 3 + start + end
@@ -15,6 +15,18 @@ class TestEncoder(unittest.TestCase):
 
         d = enc.encode("a", width=4)
         self.assertEqual(d.shape, (6, len(enc)))
+
+    def test_iterate_batches(self):
+        data = ["abc", "cde", "e", "f"]
+        r = list(input.iterate_batches(data, batch_size=2, shuffle=False))
+        self.assertEqual(2, len(r))
+        self.assertEqual(["abc", "cde"], r[0])
+        self.assertEqual(["e", "f"], r[1])
+
+        r = list(input.iterate_batches(data, batch_size=3, shuffle=False))
+        self.assertEqual(2, len(r))
+        self.assertEqual(3, len(r[0]))
+        self.assertEqual(1, len(r[1]))
 
 
 if __name__ == '__main__':
