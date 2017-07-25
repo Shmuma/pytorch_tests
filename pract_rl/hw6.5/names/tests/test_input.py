@@ -16,6 +16,11 @@ class TestData(unittest.TestCase):
         d = enc.encode("a", width=4)
         self.assertEqual(d.shape, (6, len(enc)))
 
+    def test_end_token(self):
+        enc = input.InputEncoder(['abc'])
+        r = enc.end_token()
+        self.assertEqual(5, r.shape[0])
+
     def test_iterate_batches(self):
         data = ["abc", "cde", "e", "f"]
         r = list(input.iterate_batches(data, batch_size=2, shuffle=False))
@@ -27,6 +32,12 @@ class TestData(unittest.TestCase):
         self.assertEqual(2, len(r))
         self.assertEqual(3, len(r[0]))
         self.assertEqual(1, len(r[1]))
+
+    def test_batch_to_train(self):
+        enc = input.InputEncoder(['abc'])
+        packed_seq, true_vals = input.batch_to_train(['a', 'b', 'c'], enc)
+        self.assertEqual(true_vals, "a\1\0b\1\0c\1\1")
+
 
 
 if __name__ == '__main__':
