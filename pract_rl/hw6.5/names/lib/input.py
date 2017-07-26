@@ -25,13 +25,16 @@ class InputEncoder:
     def __len__(self):
         return len(self.alphabet)
 
-    def encode(self, s, width=None):
+    def encode(self, s, width=None, raw=False):
         assert isinstance(s, str)
 
         if width is None:
             width = len(s)
-        res = np.zeros((width + 2, len(self)), dtype=np.float32)
-        for sample_idx, c in enumerate(self.START_TOKEN + s + self.END_TOKEN):
+        if not raw:
+            width += 2
+        res = np.zeros((width, len(self)), dtype=np.float32)
+        in_s = s if raw else self.START_TOKEN + s + self.END_TOKEN
+        for sample_idx, c in enumerate(in_s):
             idx = self.idx[c]
             res[sample_idx][idx] = 1.0
 

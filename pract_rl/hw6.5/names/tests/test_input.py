@@ -36,9 +36,8 @@ class TestData(unittest.TestCase):
     def test_batch_to_train(self):
         enc = input.InputEncoder(['abc'])
         packed_seq, true_vals = input.batch_to_train(['a', 'b', 'c'], enc)
-        self.assertEqual(true_vals.data.numpy(), [   1, 4,
-                                                  0, 2, 4,
-                                                  0, 3, 4, 4])
+        self.assertEqual(true_vals.data.numpy().tolist(),
+                         [2, 1, 0, 3, 1, 0, 4, 1, 1])
 
 
 

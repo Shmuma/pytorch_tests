@@ -39,10 +39,10 @@ class ModelTest(unittest.TestCase):
         optimizer = optim.SGD(net.parameters(), lr=0.1)
         max_loss = min_loss = None
 
-        for _ in range(1000):
+        for _ in range(100):
             net.zero_grad()
             packed_seq, true_indices = input.batch_to_train(data, encoder)
-            out = net(packed_seq)
+            out, _ = net(packed_seq)
             v_loss = objective(out, true_indices)
             v_loss.backward()
             optimizer.step()
@@ -54,7 +54,7 @@ class ModelTest(unittest.TestCase):
                 min_loss = min(min_loss, l)
 
         loss_drop = max_loss / min_loss
-        self.assertGreater(loss_drop, 100.0)
+        self.assertGreater(loss_drop, 10.0)
 
         # try to predict letters
         out = model.inference_one(encoder.START_TOKEN, encoder, net)
@@ -64,6 +64,30 @@ class ModelTest(unittest.TestCase):
         out = model.inference_one('aa', encoder, net)
         self.assertEquals(out, encoder.END_TOKEN)
 
+    def test_generate(self):
+        data = ['aa']
+        encoder = input.InputEncoder(data)
+        net = model.Model(len(encoder), hidden_size=10)
+        objective = nn.CrossEntropyLoss()
+        optimizer = optim.SGD(net.parameters(), lr=0.1)
+        max_loss = min_loss = None
+
+        for _ in range(100):
+            net.zero_grad()
+            packed_seq, true_indices = input.batch_to_train(data, encoder)
+            out, _ = net(packed_seq)
+            v_loss = objective(out, true_indices)
+            v_loss.backward()
+            optimizer.step()
+            l = v_loss.data[0]
+            if max_loss is None:
+                max_loss = min_loss = l
+            else:
+                max_loss = max(max_loss, l)
+                min_loss = min(min_loss, l)
+
+        res = model.generate_name(net, encoder)
+        self.assertEqual('aa', res)
 
 if __name__ == '__main__':
     unittest.main()

@@ -43,13 +43,15 @@ if __name__ == "__main__":
         for batch in input.iterate_batches(data, BATCH_SIZE):
             net.zero_grad()
             packed_seq, true_indices = input.batch_to_train(batch, input_encoder, cuda=args.cuda)
-            out = net(packed_seq)
+            out, _ = net(packed_seq)
             v_loss = objective(out, true_indices)
             v_loss.backward()
             losses.append(v_loss.data[0])
             optimizer.step()
 
         speed = len(losses) * BATCH_SIZE / (time.time() - start_ts)
-        log.info("Epoch %d: mean_loss=%.4f, speed=%.3f item/s", epoch, np.mean(losses), speed)
+        gen_names = [model.generate_name(net, input_encoder, cuda=args.cuda) for _ in range(10)]
+        log.info("Epoch %d: mean_loss=%.4f, speed=%.3f item/s, names: %s", epoch, np.mean(losses), speed,
+                 ", ".join(gen_names))
 
     pass
