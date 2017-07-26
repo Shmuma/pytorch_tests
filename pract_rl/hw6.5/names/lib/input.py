@@ -11,7 +11,7 @@ TRAIN_FILE = "names"
 
 def read_data(file_name=TRAIN_FILE):
     with open(file_name, "rt", encoding='utf-8') as fd:
-        return list(map(str.strip, fd.readlines()))
+        return list(map(lambda s: s.strip(), fd.readlines()))
 
 
 class InputEncoder:

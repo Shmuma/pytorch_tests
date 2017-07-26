@@ -11,8 +11,8 @@ from lib import input
 from lib import model
 
 
-HIDDEN_SIZE = 512
-EPOCHES = 100
+HIDDEN_SIZE = 128
+EPOCHES = 200
 BATCH_SIZE = 128
 
 log = logging.getLogger("train")
@@ -25,15 +25,16 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     data = input.read_data()
-
-    log.info("Read %d train samples, first 10: %s", len(data), ', '.join(data[:10]))
-
     input_encoder = input.InputEncoder(data)
+
+    log.info("Read %d train samples, encoder len=%d, first 10: %s", len(data),
+             len(input_encoder), ', '.join(data[:10]))
+
     net = model.Model(len(input_encoder), hidden_size=HIDDEN_SIZE)
     if args.cuda:
         net = net.cuda()
     objective = nn.CrossEntropyLoss()
-    optimizer = optim.Adagrad(net.parameters(), lr=0.01)
+    optimizer = optim.RMSprop(net.parameters(), lr=0.001)
 
     for epoch in range(EPOCHES):
         losses = []
