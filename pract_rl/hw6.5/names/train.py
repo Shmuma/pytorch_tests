@@ -13,7 +13,7 @@ from lib import model
 
 HIDDEN_SIZE = 128
 EPOCHES = 200
-BATCH_SIZE = 128
+BATCH_SIZE = 16
 
 log = logging.getLogger("train")
 
