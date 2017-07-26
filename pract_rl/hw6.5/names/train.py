@@ -13,7 +13,7 @@ from lib import model
 
 HIDDEN_SIZE = 128
 EPOCHES = 200
-BATCH_SIZE = 16
+BATCH_SIZE = 1
 
 log = logging.getLogger("train")
 
@@ -25,6 +25,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     data = input.read_data()
+#    data = data[:100]
     input_encoder = input.InputEncoder(data)
 
     log.info("Read %d train samples, encoder len=%d, first 10: %s", len(data),
