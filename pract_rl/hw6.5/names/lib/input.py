@@ -49,14 +49,17 @@ class InputEncoder:
     def chars_to_indices(self, s):
         return [self.idx[c] for c in s]
 
+    def indices_to_chars(self, indices):
+        return [self.alphabet[idx] for idx in indices]
+
 
 def iterate_batches(data, batch_size, shuffle=True):
     """
     Iterate over batches of data, last batch can be incomplete
-    :param data: list of data samples 
-    :param batch_size: length of batch to sample 
+    :param data: list of data samples
+    :param batch_size: length of batch to sample
     :param shuffle: do we need to shuffle data before iteration
-    :return: yields data in chunks 
+    :return: yields data in chunks
     """
     assert isinstance(data, list)
     assert isinstance(batch_size, int)
