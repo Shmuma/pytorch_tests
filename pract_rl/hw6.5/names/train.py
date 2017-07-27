@@ -11,9 +11,9 @@ from lib import input
 from lib import model
 
 
-HIDDEN_SIZE = 128
-EPOCHES = 200
-BATCH_SIZE = 128
+HIDDEN_SIZE = 256
+EPOCHES = 500
+BATCH_SIZE = 512
 
 log = logging.getLogger("train")
 
@@ -35,7 +35,7 @@ if __name__ == "__main__":
     if args.cuda:
         net = net.cuda()
     objective = nn.CrossEntropyLoss()
-    optimizer = optim.RMSprop(net.parameters(), lr=0.005)
+    optimizer = optim.RMSprop(net.parameters(), lr=0.004)
 
     for epoch in range(EPOCHES):
         losses = []

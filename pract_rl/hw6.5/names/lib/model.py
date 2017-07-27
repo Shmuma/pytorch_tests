@@ -14,7 +14,7 @@ class Model(nn.Module):
 
     def __init__(self, input_size, hidden_size):
         super(Model, self).__init__()
-        self.rnn = nn.RNN(input_size=input_size, hidden_size=hidden_size, batch_first=True)
+        self.rnn = nn.GRU(input_size=input_size, hidden_size=hidden_size, batch_first=True, num_layers=2)
         self.out = nn.Linear(hidden_size, input_size)
 
     def forward(self, x, hidden=None):
@@ -56,8 +56,8 @@ def inference_one(s, encoder, net):
 def generate_name(net, encoder, cuda=False):
     """
     Generate name from model
-    :param net: 
-    :param encoder: 
+    :param net:
+    :param encoder:
     :return: Generated name
     """
     result = ''
