@@ -12,7 +12,7 @@ from lib import model
 
 
 HIDDEN_SIZE = 256
-EPOCHES = 500
+EPOCHES = 5000
 BATCH_SIZE = 512
 
 log = logging.getLogger("train")
@@ -25,7 +25,6 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     data = input.read_data()
-#    data = data[:100]
     input_encoder = input.InputEncoder(data)
 
     log.info("Read %d train samples, encoder len=%d, first 10: %s", len(data),
@@ -35,7 +34,11 @@ if __name__ == "__main__":
     if args.cuda:
         net = net.cuda()
     objective = nn.CrossEntropyLoss()
-    optimizer = optim.RMSprop(net.parameters(), lr=0.004)
+
+    lr = 0.004
+    # decay of LR every 100 epoches
+    lr_decay = 0.9
+    optimizer = optim.RMSprop(net.parameters(), lr=lr)
 
     for epoch in range(EPOCHES):
         losses = []
@@ -52,7 +55,12 @@ if __name__ == "__main__":
 
         speed = len(losses) * BATCH_SIZE / (time.time() - start_ts)
         gen_names = [model.generate_name(net, input_encoder, cuda=args.cuda) for _ in range(10)]
-        log.info("Epoch %d: mean_loss=%.4f, speed=%.3f item/s, names: %s", epoch, np.mean(losses), speed,
-                 ", ".join(gen_names))
+        log.info("Epoch %d: mean_loss=%.4f, speed=%.3f item/s, lr=%.4f, names: %s", epoch, np.mean(losses), speed,
+                 lr, ", ".join(gen_names))
+
+        if epoch > 0 and epoch % 100 == 0:
+            lr *= lr_decay
+            # TODO: check for the way to decrease LR without recreating optimiser
+            optimizer = optim.RMSprop(net.parameters(), lr=lr)
 
     pass
