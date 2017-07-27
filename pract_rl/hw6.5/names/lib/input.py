@@ -55,6 +55,9 @@ class InputEncoder:
     def indices_to_chars(self, indices):
         return [self.alphabet[idx] for idx in indices]
 
+    def char_to_index(self, c):
+        return self.idx[c]
+
 
 def iterate_batches(data, batch_size, shuffle=True):
     """
@@ -101,15 +104,15 @@ def batch_to_train(batch, encoder, cuda=False):
         v_data = v_data.cuda()
     packed_seq = rnn_utils.pack_padded_sequence(v_data, lens, batch_first=True)
 
-    # build next characters list -- it will be input batch shifted one character right
-    true_vals = map(lambda s: encoder.START_TOKEN + s + encoder.END_TOKEN, batch)
-    true_vals = ''.join(true_vals)
-    true_vals = true_vals[1:] + encoder.END_TOKEN
+    end_idx = encoder.char_to_index(encoder.END_TOKEN)
+    true_idx = np.full((len(batch), max_len), fill_value=end_idx, dtype=np.long)
 
-    true_indices = encoder.chars_to_indices(true_vals)
-    v_true_indices = Variable(torch.LongTensor(true_indices))
-    if cuda:
-        v_true_indices = v_true_indices.cuda()
+    for sample_idx, sample in enumerate(batch):
+        indices = encoder.chars_to_indices(sample)
+        true_idx[sample_idx][:len(indices)] = indices
 
-    return packed_seq, v_true_indices
+    v_true_idx = Variable(torch.LongTensor(true_idx))
+    true_seq = rnn_utils.pack_padded_sequence(v_true_idx, lens, batch_first=True)
+
+    return packed_seq, true_seq.data
 
