@@ -112,6 +112,8 @@ def batch_to_train(batch, encoder, cuda=False):
         true_idx[sample_idx][:len(indices)] = indices
 
     v_true_idx = Variable(torch.LongTensor(true_idx))
+    if cuda:
+        v_true_idx = v_true_idx.cuda()
     true_seq = rnn_utils.pack_padded_sequence(v_true_idx, lens, batch_first=True)
 
     return packed_seq, true_seq.data
