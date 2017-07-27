@@ -13,7 +13,7 @@ from lib import model
 
 HIDDEN_SIZE = 128
 EPOCHES = 200
-BATCH_SIZE = 1
+BATCH_SIZE = 2
 
 log = logging.getLogger("train")
 
@@ -44,7 +44,7 @@ if __name__ == "__main__":
         for batch in input.iterate_batches(data, BATCH_SIZE):
             net.zero_grad()
             packed_seq, true_indices = input.batch_to_train(batch, input_encoder, cuda=args.cuda)
-            out, _ = net(packed_seq)
+            out, h = net(packed_seq)
             v_loss = objective(out, true_indices)
             v_loss.backward()
             losses.append(v_loss.data[0])
