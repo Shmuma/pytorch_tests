@@ -46,6 +46,6 @@ if __name__ == "__main__":
     input_seq, valid_t = data.batch_to_train(batch, words)
 
     out, h = net(input_seq)
-    print(out)
+    print(out.size())
 
     pass

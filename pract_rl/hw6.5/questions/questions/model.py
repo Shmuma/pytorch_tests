@@ -8,11 +8,16 @@ class FixedEmbeddingsModel(nn.Module):
         super(FixedEmbeddingsModel, self).__init__()
         self.embeddings = nn.Embedding(embeddings.shape[0], embeddings.shape[1])
         self.rnn = nn.RNN(input_size=embeddings.shape[1], hidden_size=hidden_size, batch_first=True)
-        self.out = nn.Linear(hidden_size, embeddings.shape[1])
+        self.out = nn.Linear(hidden_size, embeddings.shape[0])
 
     def forward(self, x, h=None):
-        in_seq = self.embeddings(x)
-        rnn_out, rnn_hidden = self.rnn(in_seq, h)
+
+        if isinstance(x, rnn_utils.PackedSequence):
+            x_emb = self.embeddings(x.data)
+            rnn_in = rnn_utils.PackedSequence(data=x_emb, batch_sizes=x.batch_sizes)
+        else:
+            rnn_in = self.embeddings(x)
+        rnn_out, rnn_hidden = self.rnn(rnn_in, h)
         out = self.out(rnn_out.data)
         return out, rnn_hidden
 
