@@ -59,7 +59,7 @@ if __name__ == "__main__":
     net = model.FixedEmbeddingsModel(embeddings, HIDDEN_SIZE)
     if args.cuda:
         net.cuda()
-    optimizer = optim.Adam(filter(lambda p: p.requires_grad, net.parameters()), lr=0.01)
+    optimizer = optim.Adam(filter(lambda p: p.requires_grad, net.parameters()), lr=0.001)
     objective = nn.CrossEntropyLoss()
 
     best_loss = None
