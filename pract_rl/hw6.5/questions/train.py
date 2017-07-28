@@ -9,15 +9,17 @@ from questions import data, model
 
 import torch
 import torch.nn as nn
-import torch.nn.utils.rnn as rnn_utils
-from torch.autograd import Variable
+import torch.optim as optim
 
 
 log = logging.getLogger("train")
 
+
 TRAIN_DATA_FILE = "~/work/data/experiments/quora-questions/train.csv"
 GLOVE_EMBEDDINGS = "~/work/data/experiments/glove.6B.50d.txt"
 HIDDEN_SIZE = 128
+EPOCHES = 100
+BATCH_SIZE = 1
 
 
 if __name__ == "__main__":
@@ -48,11 +50,24 @@ if __name__ == "__main__":
     log.info("All preparations took %s", datetime.timedelta(seconds=time.time() - time_s))
 
     net = model.FixedEmbeddingsModel(embeddings, HIDDEN_SIZE)
+    optimizer = optim.Adam(net.parameters(), lr=0.001)
+    objective = nn.CrossEntropyLoss()
 
-    batch = [train_sequences[0]]
-    input_seq, valid_t = data.batch_to_train(batch, words)
+    for epoch in range(EPOCHES):
+        time_s = time.time()
+        losses = []
 
-    out, h = net(input_seq)
-    print(out.size())
+        for batch in data.iterate_batches(train_sequences, BATCH_SIZE):
+            net.zero_grad()
+            input_seq, valid_v = data.batch_to_train(batch, words)
+            out, _ = net(input_seq)
+
+            loss_v = objective(out, valid_v)
+            loss_v.backward()
+            optimizer.step()
+            losses.append(loss_v.data[0])
+
+        speed = len(losses) * BATCH_SIZE / (time.time() - time_s)
+        log.info("Epoch %d: mean_loss=%.4, speed=%.3f item/s", epoch, np.mean(losses), speed)
 
     pass

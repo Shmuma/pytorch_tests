@@ -1,3 +1,4 @@
+import random
 import pandas as pd
 import numpy as np
 
@@ -83,7 +84,7 @@ def batch_to_train(batch, words_dict):
     output = []
     for sample in batch:
         data.append(sample + [end_idx] * (lens[0] - len(sample)))
-        output.append(sample[1:] + [end_idx] * (lens[0] - len(sample) - 1))
+        output.append(sample[1:] + [end_idx] * (lens[0] - len(sample) + 1))
     data_v = Variable(torch.LongTensor(data))
     out_v = Variable(torch.LongTensor(output))
 
@@ -91,3 +92,22 @@ def batch_to_train(batch, words_dict):
     output_seq = rnn_utils.pack_padded_sequence(out_v, lens, batch_first=True)
 
     return input_seq, output_seq.data
+
+
+def iterate_batches(data, batch_size, shuffle=True):
+    """
+    Iterate over batches of data, last batch can be incomplete
+    :param data: list of data samples
+    :param batch_size: length of batch to sample
+    :param shuffle: do we need to shuffle data before iteration
+    :return: yields data in chunks
+    """
+    assert isinstance(data, list)
+    assert isinstance(batch_size, int)
+
+    if shuffle:
+        random.shuffle(data)
+    ofs = 0
+    while ofs*batch_size < len(data):
+        yield data[ofs*batch_size:(ofs+1)*batch_size]
+        ofs += 1
