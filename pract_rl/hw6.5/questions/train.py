@@ -9,6 +9,7 @@ import numpy as np
 
 from questions import data, model
 
+import torch
 import torch.nn as nn
 import torch.optim as optim
 
@@ -31,7 +32,11 @@ if __name__ == "__main__":
     parser.add_argument("-t", "--train", default=TRAIN_DATA_FILE,
                         help="Train data file, default=%s" % TRAIN_DATA_FILE)
     parser.add_argument("--cuda", default=False, action='store_true', help="Enable cuda")
+    parser.add_argument("--name", required=True, help="Name of directory to save models to")
     args = parser.parse_args()
+
+    save_path = os.path.join("saves", args.name)
+    os.makedirs(save_path, exist_ok=True)
 
     time_s = time.time()
     log.info("Reading training data from %s", args.train)
@@ -57,11 +62,13 @@ if __name__ == "__main__":
     optimizer = optim.Adam(filter(lambda p: p.requires_grad, net.parameters()), lr=0.001)
     objective = nn.CrossEntropyLoss()
 
+    best_loss = None
+
     for epoch in range(EPOCHES):
         time_s = time.time()
         losses = []
 
-        for batch in tqdm(data.iterate_batches(train_sequences, BATCH_SIZE), total=len(train_sequences)/BATCH_SIZE):
+        for batch in tqdm(data.iterate_batches(train_sequences, BATCH_SIZE), total=len(train_sequences)//BATCH_SIZE):
             net.zero_grad()
             input_seq, valid_v = data.batch_to_train(batch, words, args.cuda)
             out, _ = net(input_seq)
@@ -72,6 +79,13 @@ if __name__ == "__main__":
             losses.append(loss_v.cpu().data[0])
 
         speed = len(losses) * BATCH_SIZE / (time.time() - time_s)
-        log.info("Epoch %d: mean_loss=%.4f, speed=%.3f item/s", epoch, np.mean(losses), speed)
+        loss = np.mean(losses)
+        log.info("Epoch %d: mean_loss=%.4f, speed=%.3f item/s", epoch, loss, speed)
+
+        if best_loss is None or best_loss > loss:
+            path = os.path.join(save_path, "%04d-model-loss=%.4f.data" % (epoch, loss))
+            torch.save(net.state_dict(), path)
+            log.info("Best loss updated: %.4f -> %.4f, model saved in %s",
+                     np.inf if best_loss is None else best_loss, loss, path)
 
     pass
