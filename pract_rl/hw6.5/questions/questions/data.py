@@ -29,11 +29,11 @@ def read_embeddings(file_name, train_tokens=None):
             whitelist.update(tokens)
 
     with open(file_name, "rt", encoding='utf-8') as fd:
-        for idx, l in enumerate(fd):
+        for l in fd:
             word, rest = l.split(' ', maxsplit=1)
             if whitelist is None or word in whitelist:
                 rest = rest.split(' ')
-                words[word] = idx
+                words[word] = len(words)
                 vectors.append(list(map(float, rest)))
         words[END_TOKEN] = len(words)
         vectors.append(np.zeros((len(vectors[0], ))))

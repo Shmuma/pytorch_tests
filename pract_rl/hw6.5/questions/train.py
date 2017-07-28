@@ -51,6 +51,8 @@ if __name__ == "__main__":
     log.info("All preparations took %s", datetime.timedelta(seconds=time.time() - time_s))
 
     net = model.FixedEmbeddingsModel(embeddings, HIDDEN_SIZE)
+    for p in net.parameters():
+        print(p.size())
     optimizer = optim.Adam(net.parameters(), lr=0.001)
     objective = nn.CrossEntropyLoss()
 
