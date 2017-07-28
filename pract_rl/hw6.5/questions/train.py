@@ -4,6 +4,7 @@ import time
 import logging
 import datetime
 import argparse
+import numpy as np
 
 from questions import data, model
 
