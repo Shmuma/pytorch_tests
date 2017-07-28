@@ -6,7 +6,12 @@ import torch.nn.utils.rnn as rnn_utils
 class FixedEmbeddingsModel(nn.Module):
     def __init__(self, embeddings, hidden_size):
         super(FixedEmbeddingsModel, self).__init__()
+
+        # create fixed embeddings layer
         self.embeddings = nn.Embedding(embeddings.shape[0], embeddings.shape[1])
+        self.embeddings.weight.data.copy_(torch.from_numpy(embeddings))
+        self.embeddings.weight.requires_grad = False
+
         self.rnn = nn.RNN(input_size=embeddings.shape[1], hidden_size=hidden_size, batch_first=True)
         self.out = nn.Linear(hidden_size, embeddings.shape[0])
 

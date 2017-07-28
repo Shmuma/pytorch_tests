@@ -73,7 +73,7 @@ def tokens_to_embeddings(tokens_data, words_dict):
     return result
 
 
-def batch_to_train(batch, words_dict):
+def batch_to_train(batch, words_dict, cuda=False):
     assert isinstance(batch, list)
 
     batch.sort(key=len, reverse=True)
@@ -87,6 +87,10 @@ def batch_to_train(batch, words_dict):
         output.append(sample[1:] + [end_idx] * (lens[0] - len(sample) + 1))
     data_v = Variable(torch.LongTensor(data))
     out_v = Variable(torch.LongTensor(output))
+
+    if cuda:
+        data_v = data_v.cuda()
+        out_v = out_v.cuda()
 
     input_seq = rnn_utils.pack_padded_sequence(data_v, lens, batch_first=True)
     output_seq = rnn_utils.pack_padded_sequence(out_v, lens, batch_first=True)

@@ -4,11 +4,11 @@ import time
 import logging
 import datetime
 import argparse
+from tqdm import tqdm
 import numpy as np
 
 from questions import data, model
 
-import torch
 import torch.nn as nn
 import torch.optim as optim
 
@@ -20,7 +20,7 @@ TRAIN_DATA_FILE = "~/work/data/experiments/quora-questions/train.csv"
 GLOVE_EMBEDDINGS = "~/work/data/experiments/glove.6B.50d.txt"
 HIDDEN_SIZE = 128
 EPOCHES = 100
-BATCH_SIZE = 1
+BATCH_SIZE = 128
 
 
 if __name__ == "__main__":
@@ -30,6 +30,7 @@ if __name__ == "__main__":
                         help="File with embeddings to read, default=%s" % GLOVE_EMBEDDINGS)
     parser.add_argument("-t", "--train", default=TRAIN_DATA_FILE,
                         help="Train data file, default=%s" % TRAIN_DATA_FILE)
+    parser.add_argument("--cuda", default=False, action='store_true', help="Enable cuda")
     args = parser.parse_args()
 
     time_s = time.time()
@@ -51,24 +52,24 @@ if __name__ == "__main__":
     log.info("All preparations took %s", datetime.timedelta(seconds=time.time() - time_s))
 
     net = model.FixedEmbeddingsModel(embeddings, HIDDEN_SIZE)
-    for p in net.parameters():
-        print(p.size())
-    optimizer = optim.Adam(net.parameters(), lr=0.001)
+    if args.cuda:
+        net.cuda()
+    optimizer = optim.Adam(filter(lambda p: p.requires_grad, net.parameters()), lr=0.001)
     objective = nn.CrossEntropyLoss()
 
     for epoch in range(EPOCHES):
         time_s = time.time()
         losses = []
 
-        for batch in data.iterate_batches(train_sequences, BATCH_SIZE):
+        for batch in tqdm(data.iterate_batches(train_sequences, BATCH_SIZE), total=len(train_sequences)/BATCH_SIZE):
             net.zero_grad()
-            input_seq, valid_v = data.batch_to_train(batch, words)
+            input_seq, valid_v = data.batch_to_train(batch, words, args.cuda)
             out, _ = net(input_seq)
 
             loss_v = objective(out, valid_v)
             loss_v.backward()
             optimizer.step()
-            losses.append(loss_v.data[0])
+            losses.append(loss_v.cpu().data[0])
 
         speed = len(losses) * BATCH_SIZE / (time.time() - time_s)
         log.info("Epoch %d: mean_loss=%.4, speed=%.3f item/s", epoch, np.mean(losses), speed)
