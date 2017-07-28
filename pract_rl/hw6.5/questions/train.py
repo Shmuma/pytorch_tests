@@ -68,11 +68,9 @@ if __name__ == "__main__":
     for epoch in range(EPOCHES):
         time_s = time.time()
         losses = []
-        lens = 0
 
         for batch in tqdm(data.iterate_batches(train_sequences, BATCH_TOKENS),
                           total=total_tokens // BATCH_TOKENS):
-            lens += sum(map(len, batch))
             net.zero_grad()
             input_seq, valid_v = data.batch_to_train(batch, words, args.cuda)
             out, _ = net(input_seq)
@@ -81,8 +79,7 @@ if __name__ == "__main__":
             loss_v.backward()
             optimizer.step()
             losses.append(loss_v.cpu().data[0])
-        log.info("Mean len=%.2f", lens/len(losses))
-        speed = len(losses) * BATCH_SIZE / (time.time() - time_s)
+        speed = len(train_sequences) / (time.time() - time_s)
         loss = np.mean(losses)
         log.info("Epoch %d: mean_loss=%.4f, speed=%.3f item/s", epoch, loss, speed)
 
