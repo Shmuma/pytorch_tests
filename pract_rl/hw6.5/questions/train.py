@@ -59,7 +59,7 @@ if __name__ == "__main__":
     net = model.FixedEmbeddingsModel(embeddings, HIDDEN_SIZE)
     if args.cuda:
         net.cuda()
-    optimizer = optim.Adam(filter(lambda p: p.requires_grad, net.parameters()), lr=0.001)
+    optimizer = optim.Adam(filter(lambda p: p.requires_grad, net.parameters()), lr=0.01)
     objective = nn.CrossEntropyLoss()
 
     best_loss = None
@@ -88,5 +88,6 @@ if __name__ == "__main__":
             torch.save(net.state_dict(), path)
             log.info("Best loss updated: %.4f -> %.4f, model saved in %s",
                      np.inf if best_loss is None else best_loss, loss, path)
+            best_loss = loss
 
     pass
