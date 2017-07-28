@@ -72,6 +72,6 @@ if __name__ == "__main__":
             losses.append(loss_v.cpu().data[0])
 
         speed = len(losses) * BATCH_SIZE / (time.time() - time_s)
-        log.info("Epoch %d: mean_loss=%.4, speed=%.3f item/s", epoch, np.mean(losses), speed)
+        log.info("Epoch %d: mean_loss=%.4f, speed=%.3f item/s", epoch, np.mean(losses), speed)
 
     pass
