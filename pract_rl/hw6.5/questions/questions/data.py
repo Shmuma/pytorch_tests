@@ -8,31 +8,34 @@ import torch.nn.utils.rnn as rnn_utils
 from torch.autograd import Variable
 
 
-UNKNOWN_TOKEN = '<unk>'
-START_TOKEN = '<start>'
 END_TOKEN = '<end>'
 
 
-def read_embeddings(file_name):
+def read_embeddings(file_name, train_tokens=None):
     """
     Read embeddings file
-    :param file_name:
+    :param file_name: file to read
+    :param train_tokens: list of list of string with sequences to filter embeddings. If None, we'll read all embeddings
     :return: tuple of dict word->id and numpy matrix with embeddings
     """
     words = {}
     vectors = []
+    if train_tokens is None:
+        whitelist = None
+    else:
+        whitelist = set()
+        for tokens in train_tokens:
+            whitelist.update(tokens)
 
     with open(file_name, "rt", encoding='utf-8') as fd:
         for idx, l in enumerate(fd):
-            word, *rest = l.split(' ')
-            words[word] = idx
-            vectors.append(list(map(float, rest)))
-        words[UNKNOWN_TOKEN] = len(words)
-        vectors.append(np.zeros((len(vectors[0], ))))
-        words[START_TOKEN] = len(words)
-        vectors.append(np.random.rand(len(vectors[0])))
+            word, rest = l.split(' ', maxsplit=1)
+            if whitelist is None or word in whitelist:
+                rest = rest.split(' ')
+                words[word] = idx
+                vectors.append(list(map(float, rest)))
         words[END_TOKEN] = len(words)
-        vectors.append(np.random.rand(len(vectors[0])))
+        vectors.append(np.zeros((len(vectors[0], ))))
 
     return words, np.array(vectors)
 
@@ -45,29 +48,28 @@ def read_questions(file_name):
     return list(questions)
 
 
-def tokenize_questions(data, words_dict):
+def tokenise_data(data):
     """
-    Perform input data tokenisation using Tweet tokeniser from nltk and convert data into word indices
-    :param data: list of sentences to be tokenised
-    :param words_dict: map of words -> idx
-    :return: tuple of [[idx]*], set_of_unknown_words
+    Perform tokenisation and preprocessing of input questions
+    :param data: list of strings
+    :return: list of list of strings 
     """
-    token = TweetTokenizer()
-    unknown_words = set()
-    unk_idx = words_dict[UNKNOWN_TOKEN]
-    start_idx = words_dict[START_TOKEN]
-    end_idx = words_dict[END_TOKEN]
-    res = []
-    for s in data:
-        items = [start_idx]
-        for w in token.tokenize(s.lower()):
-            idx = words_dict.get(w, unk_idx)
-            items.append(idx)
-            if idx == unk_idx:
-                unknown_words.add(w)
-        items.append(end_idx)
-        res.append(items)
-    return res, unknown_words
+    token = TweetTokenizer(preserve_case=False)
+    return [token.tokenize(s) + [END_TOKEN] for s in data]
+
+
+def tokens_to_embeddings(tokens_data, words_dict):
+    """
+    Convert list of list of tokens to list of indices, filtering unknown words 
+    :param tokens_data: list of list of string 
+    :param words_dict: map from word to their index
+    :return: list of list of int 
+    """
+    result = []
+    for tokens in tokens_data:
+        indices = [words_dict[token] for token in tokens if token in words_dict]
+        result.append(indices)
+    return result
 
 
 def batch_to_train(batch, words_dict):

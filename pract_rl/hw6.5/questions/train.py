@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 import os
+import time
 import logging
+import datetime
 import argparse
 
 from questions import data, model
@@ -27,18 +29,23 @@ if __name__ == "__main__":
                         help="Train data file, default=%s" % TRAIN_DATA_FILE)
     args = parser.parse_args()
 
-    log.info("Reading embeddings from %s", args.embeddings)
-    words, embeddings = data.read_embeddings(os.path.expanduser(args.embeddings))
-    log.info("Read successfully, shape = %s", embeddings.shape)
-
+    time_s = time.time()
     log.info("Reading training data from %s", args.train)
     train = data.read_questions(os.path.expanduser(args.train))
     log.info("Done, got %d input sequences", len(train))
 
-    log.info("Tokenize samples...")
-    train_sequences, unknown_words = data.tokenize_questions(train, words)
+    log.info("Tokenize questions...")
+    train_tokens = data.tokenise_data(train)
+    log.info("Done, have %d total tokens", sum(map(len, train_tokens)))
+
+    log.info("Reading embeddings from %s", args.embeddings)
+    words, embeddings = data.read_embeddings(os.path.expanduser(args.embeddings), train_tokens)
+    log.info("Read successfully, shape = %s", embeddings.shape)
+
+    log.info("Convert samples to index lists...")
+    train_sequences = data.tokens_to_embeddings(train_tokens, words)
     log.info("Done, sample: %s -> %s", train[0], train_sequences[0])
-    log.info("There are %d unknown words", len(unknown_words))
+    log.info("All preparations took %s", datetime.timedelta(seconds=time.time() - time_s))
 
     net = model.FixedEmbeddingsModel(embeddings, HIDDEN_SIZE)
 
