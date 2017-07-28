@@ -36,7 +36,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     save_path = os.path.join("saves", args.name)
-    os.makedirs(save_path, exist_ok=True)
+    os.makedirs(save_path, exist_ok=False)
 
     time_s = time.time()
     log.info("Reading training data from %s", args.train)
@@ -68,7 +68,8 @@ if __name__ == "__main__":
         time_s = time.time()
         losses = []
 
-        for batch in tqdm(data.iterate_batches(train_sequences, BATCH_SIZE), total=len(train_sequences)//BATCH_SIZE):
+        for batch in tqdm(data.iterate_batches(train_sequences, BATCH_SIZE),
+                          total=len(train_sequences)//BATCH_SIZE):
             net.zero_grad()
             input_seq, valid_v = data.batch_to_train(batch, words, args.cuda)
             out, _ = net(input_seq)
