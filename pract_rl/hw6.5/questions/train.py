@@ -20,8 +20,8 @@ log = logging.getLogger("train")
 TRAIN_DATA_FILE = "~/work/data/experiments/quora-questions/train.csv"
 GLOVE_EMBEDDINGS = "~/work/data/experiments/glove.6B.50d.txt"
 HIDDEN_SIZE = 128
-EPOCHES = 100
-BATCH_SIZE = 256
+EPOCHES = 200
+BATCH_TOKENS = 4500
 
 
 if __name__ == "__main__":
@@ -45,7 +45,8 @@ if __name__ == "__main__":
 
     log.info("Tokenize questions...")
     train_tokens = data.tokenise_data(train)
-    log.info("Done, have %d total tokens", sum(map(len, train_tokens)))
+    total_tokens = sum(map(len, train_tokens))
+    log.info("Done, have %d total tokens", total_tokens)
 
     log.info("Reading embeddings from %s", args.embeddings)
     words, embeddings = data.read_embeddings(os.path.expanduser(args.embeddings), train_tokens)
@@ -67,9 +68,11 @@ if __name__ == "__main__":
     for epoch in range(EPOCHES):
         time_s = time.time()
         losses = []
+        lens = 0
 
-        for batch in tqdm(data.iterate_batches(train_sequences, BATCH_SIZE),
-                          total=len(train_sequences)//BATCH_SIZE):
+        for batch in tqdm(data.iterate_batches(train_sequences, BATCH_TOKENS),
+                          total=total_tokens // BATCH_TOKENS):
+            lens += sum(map(len, batch))
             net.zero_grad()
             input_seq, valid_v = data.batch_to_train(batch, words, args.cuda)
             out, _ = net(input_seq)
@@ -78,14 +81,18 @@ if __name__ == "__main__":
             loss_v.backward()
             optimizer.step()
             losses.append(loss_v.cpu().data[0])
-
+        log.info("Mean len=%.2f", lens/len(losses))
         speed = len(losses) * BATCH_SIZE / (time.time() - time_s)
         loss = np.mean(losses)
         log.info("Epoch %d: mean_loss=%.4f, speed=%.3f item/s", epoch, loss, speed)
 
         if best_loss is None or best_loss > loss:
             path = os.path.join(save_path, "%04d-model-loss=%.4f.data" % (epoch, loss))
-            torch.save(net.state_dict(), path)
+            state = net.state_dict()
+            for k in state.keys():
+                if k.startswith('embeddings'):
+                    state.pop(k)
+            torch.save(state, path)
             log.info("Best loss updated: %.4f -> %.4f, model saved in %s",
                      np.inf if best_loss is None else best_loss, loss, path)
             best_loss = loss

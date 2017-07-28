@@ -98,20 +98,25 @@ def batch_to_train(batch, words_dict, cuda=False):
     return input_seq, output_seq.data
 
 
-def iterate_batches(data, batch_size, shuffle=True):
+def iterate_batches(data, batch_tokens, shuffle=True):
     """
     Iterate over batches of data, last batch can be incomplete
     :param data: list of data samples
-    :param batch_size: length of batch to sample
+    :param batch_tokens: count of tokens to sample
     :param shuffle: do we need to shuffle data before iteration
     :return: yields data in chunks
     """
     assert isinstance(data, list)
-    assert isinstance(batch_size, int)
+    assert isinstance(batch_tokens, int)
 
     if shuffle:
         random.shuffle(data)
-    ofs = 0
-    while ofs*batch_size < len(data):
-        yield data[ofs*batch_size:(ofs+1)*batch_size]
-        ofs += 1
+    batch = []
+    batch_size = 0
+    for sample in data:
+        batch.append(sample)
+        batch_size += len(sample)
+        if batch_size > batch_tokens:
+            yield batch
+            batch = []
+            batch_size = 0
