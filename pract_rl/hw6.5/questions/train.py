@@ -22,7 +22,7 @@ log = logging.getLogger("train")
 TRAIN_DATA_FILE = "~/work/data/experiments/quora-questions/train.csv"
 GLOVE_EMBEDDINGS = "~/work/data/experiments/glove.6B.50d.txt"
 HIDDEN_SIZE = 512
-EPOCHES = 200
+EPOCHES = 500
 BATCH_TOKENS = 3000
 
 
@@ -71,7 +71,14 @@ if __name__ == "__main__":
     net = model.FixedEmbeddingsModel(embeddings, HIDDEN_SIZE)
     if args.cuda:
         net.cuda()
-    optimizer = optim.Adam(filter(lambda p: p.requires_grad, net.parameters()), lr=0.001)
+    lr = 0.001
+    lr_decay = 0.9
+    lr_decay_epoches = 50
+
+    def make_optimizer(opt_lr):
+        return optim.Adam(filter(lambda p: p.requires_grad, net.parameters()), lr=opt_lr)
+
+    optimizer = make_optimizer(lr)
     objective = nn.CrossEntropyLoss()
 
     best_loss = None
@@ -108,5 +115,9 @@ if __name__ == "__main__":
             log.info("Best loss updated: %.4f -> %.4f, model saved in %s",
                      np.inf if best_loss is None else best_loss, loss, path)
             best_loss = loss
-
+        # lr decay
+        if lr_decay is not None and epoch > 0 and epoch % lr_decay_epoches == 0:
+            lr *= lr_decay
+            optimizer = make_optimizer(lr)
+            log.info("LR decreased to %.5f", lr)
     pass
