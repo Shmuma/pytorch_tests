@@ -59,6 +59,7 @@ if __name__ == "__main__":
 
     log.info("Reading embeddings from %s", args.embeddings)
     words, embeddings = data.read_embeddings(os.path.expanduser(args.embeddings), train_tokens)
+    rev_words = {idx: token for token, idx in words.items()}
     log.info("Read successfully, shape = %s", embeddings.shape)
 
     log.info("Convert samples to index lists...")
@@ -92,12 +93,14 @@ if __name__ == "__main__":
         speed = len(train_sequences) / (time.time() - time_s)
         loss = np.mean(losses)
         epoch_losses.append(loss)
+
         log.info("Epoch %d: mean_loss=%.4f, speed=%.3f item/s", epoch, loss, speed)
+        question = model.generate_question(net, words, rev_words, args.cuda)
+        print("Question on epoch %d: %s" % (epoch, " ".join(question)))
         plots.plot_progress(epoch_losses, os.path.join(save_path, "status.html"))
 
         if best_loss is None or best_loss > loss:
             path = os.path.join(save_path, "%04d-model-loss=%.4f.data" % (epoch, loss))
-            #new_state = {k: v for k, v in net.state_dict().items() if not k.startswith("embeddings")}
             new_state = net.state_dict()
             torch.save(new_state, path)
             log.info("Best loss updated: %.4f -> %.4f, model saved in %s",
