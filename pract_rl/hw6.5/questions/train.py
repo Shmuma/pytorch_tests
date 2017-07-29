@@ -3,11 +3,12 @@ import os
 import time
 import logging
 import datetime
+import random
 import argparse
 from tqdm import tqdm
 import numpy as np
 
-from questions import data, model
+from questions import data, model, plots
 
 import torch
 import torch.nn as nn
@@ -25,6 +26,7 @@ BATCH_TOKENS = 4000
 
 
 if __name__ == "__main__":
+    random.seed(1234)
     logging.basicConfig(format="%(asctime)-15s %(levelname)s %(name)-14s %(message)s", level=logging.INFO)
     parser = argparse.ArgumentParser()
     parser.add_argument("-e", "--embeddings", default=GLOVE_EMBEDDINGS,
@@ -41,6 +43,9 @@ if __name__ == "__main__":
     time_s = time.time()
     log.info("Reading training data from %s", args.train)
     train = data.read_questions(os.path.expanduser(args.train))
+    train.sort()
+    random.shuffle(train)
+    train = train[:5000]
     log.info("Done, got %d input sequences", len(train))
 
     log.info("Tokenize questions...")
@@ -64,6 +69,7 @@ if __name__ == "__main__":
     objective = nn.CrossEntropyLoss()
 
     best_loss = None
+    epoch_losses = []
 
     for epoch in range(EPOCHES):
         time_s = time.time()
@@ -81,7 +87,9 @@ if __name__ == "__main__":
             losses.append(loss_v.cpu().data[0])
         speed = len(train_sequences) / (time.time() - time_s)
         loss = np.mean(losses)
+        epoch_losses.append(loss)
         log.info("Epoch %d: mean_loss=%.4f, speed=%.3f item/s", epoch, loss, speed)
+        plots.plot_progress(epoch_losses, os.path.join(save_path, "status.html"))
 
         if best_loss is None or best_loss > loss:
             path = os.path.join(save_path, "%04d-model-loss=%.4f.data" % (epoch, loss))
