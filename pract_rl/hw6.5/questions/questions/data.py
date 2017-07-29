@@ -8,7 +8,6 @@ import torch
 import torch.nn.utils.rnn as rnn_utils
 from torch.autograd import Variable
 
-START_TOKEN = '<start>'
 END_TOKEN = '<end>'
 
 
@@ -35,8 +34,8 @@ def read_embeddings(file_name, train_tokens=None):
                 rest = rest.split(' ')
                 words[word] = len(words)
                 vectors.append(list(map(float, rest)))
-        words[START_TOKEN] = len(words)
-        vectors.append(np.ones((len(vectors[0], ))))
+        # words[START_TOKEN] = len(words)
+        # vectors.append(np.ones((len(vectors[0], ))))
         words[END_TOKEN] = len(words)
         vectors.append(np.zeros((len(vectors[0], ))))
 
@@ -58,7 +57,7 @@ def tokenise_data(data):
     :return: list of list of strings 
     """
     token = TweetTokenizer(preserve_case=False)
-    return [[START_TOKEN] + token.tokenize(s) + [END_TOKEN] for s in data]
+    return [token.tokenize(s) + [END_TOKEN] for s in data]
 
 
 def tokens_to_embeddings(tokens_data, words_dict):
