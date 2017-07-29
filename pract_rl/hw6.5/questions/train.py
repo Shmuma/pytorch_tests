@@ -35,6 +35,7 @@ if __name__ == "__main__":
                         help="Train data file, default=%s" % TRAIN_DATA_FILE)
     parser.add_argument("--cuda", default=False, action='store_true', help="Enable cuda")
     parser.add_argument("--name", required=True, help="Name of directory to save models to")
+    parser.add_argument("--tiny", default=False, action='store_true', help="Limit amount of samples to 5000")
     args = parser.parse_args()
 
     save_path = os.path.join("saves", args.name)
@@ -45,7 +46,9 @@ if __name__ == "__main__":
     train = data.read_questions(os.path.expanduser(args.train))
     train.sort()
     random.shuffle(train)
-    train = train[:5000]
+    if args.tiny:
+        train = train[:5000]
+        save_path += "-tiny"
     log.info("Done, got %d input sequences", len(train))
 
     log.info("Tokenize questions...")
