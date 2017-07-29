@@ -39,6 +39,8 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     save_path = os.path.join("saves", args.name)
+    if args.tiny:
+        save_path += "-tiny"
     os.makedirs(save_path, exist_ok=False)
 
     time_s = time.time()
@@ -48,7 +50,6 @@ if __name__ == "__main__":
     random.shuffle(train)
     if args.tiny:
         train = train[:5000]
-        save_path += "-tiny"
     log.info("Done, got %d input sequences", len(train))
 
     log.info("Tokenize questions...")
