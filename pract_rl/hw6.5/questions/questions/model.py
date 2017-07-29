@@ -12,7 +12,7 @@ class FixedEmbeddingsModel(nn.Module):
         self.embeddings.weight.data.copy_(torch.from_numpy(embeddings))
 #        self.embeddings.weight.requires_grad = False
 
-        self.rnn = nn.GRU(input_size=embeddings.shape[1], hidden_size=hidden_size, batch_first=True)
+        self.rnn = nn.LSTM(input_size=embeddings.shape[1], hidden_size=hidden_size, batch_first=True)
         self.out = nn.Linear(hidden_size, embeddings.shape[0])
 
     def forward(self, x, h=None):

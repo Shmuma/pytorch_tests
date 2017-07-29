@@ -20,7 +20,7 @@ log = logging.getLogger("train")
 
 TRAIN_DATA_FILE = "~/work/data/experiments/quora-questions/train.csv"
 GLOVE_EMBEDDINGS = "~/work/data/experiments/glove.6B.50d.txt"
-HIDDEN_SIZE = 128
+HIDDEN_SIZE = 512
 EPOCHES = 200
 BATCH_TOKENS = 4000
 
