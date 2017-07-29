@@ -22,7 +22,7 @@ TRAIN_DATA_FILE = "~/work/data/experiments/quora-questions/train.csv"
 GLOVE_EMBEDDINGS = "~/work/data/experiments/glove.6B.50d.txt"
 HIDDEN_SIZE = 512
 EPOCHES = 200
-BATCH_TOKENS = 4000
+BATCH_TOKENS = 3000
 
 
 if __name__ == "__main__":
