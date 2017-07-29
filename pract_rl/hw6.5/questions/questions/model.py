@@ -10,7 +10,7 @@ class FixedEmbeddingsModel(nn.Module):
         # create fixed embeddings layer
         self.embeddings = nn.Embedding(embeddings.shape[0], embeddings.shape[1])
         self.embeddings.weight.data.copy_(torch.from_numpy(embeddings))
-        self.embeddings.weight.requires_grad = False
+#        self.embeddings.weight.requires_grad = False
 
         self.rnn = nn.GRU(input_size=embeddings.shape[1], hidden_size=hidden_size, batch_first=True)
         self.out = nn.Linear(hidden_size, embeddings.shape[0])

@@ -93,7 +93,8 @@ if __name__ == "__main__":
 
         if best_loss is None or best_loss > loss:
             path = os.path.join(save_path, "%04d-model-loss=%.4f.data" % (epoch, loss))
-            new_state = {k: v for k, v in net.state_dict().items() if not k.startswith("embeddings")}
+            #new_state = {k: v for k, v in net.state_dict().items() if not k.startswith("embeddings")}
+            new_state = net.state_dict()
             torch.save(new_state, path)
             log.info("Best loss updated: %.4f -> %.4f, model saved in %s",
                      np.inf if best_loss is None else best_loss, loss, path)
