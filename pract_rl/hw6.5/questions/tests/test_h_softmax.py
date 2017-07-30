@@ -34,6 +34,19 @@ class TestMisc(unittest.TestCase):
         res = hsm(scores, class_indices)
         self.assertGreater(res.data.cpu().numpy()[0], 10.0)
 
+    def test_gather(self):
+        t = torch.arange(0, 12).view(4, 3)
+        idx = torch.LongTensor([[0, 0, 0], [3, 3, 3]])
+        r = torch.gather(t, dim=0, index=idx)
+        print(t)
+
+    def test_prepend(self):
+        t = torch.arange(0, 12).view(4, 3)
+        z = torch.zeros(4, 1)
+        r = torch.cat([z, t], dim=1)
+        print(r)
+
+
 
 if __name__ == '__main__':
     unittest.main()
