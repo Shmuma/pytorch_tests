@@ -10,17 +10,22 @@ from . import data
 
 
 class FixedEmbeddingsModel(nn.Module):
-    def __init__(self, embeddings, hidden_size):
+    def __init__(self, embeddings, hidden_size, h_softmax=False):
         super(FixedEmbeddingsModel, self).__init__()
 
+        dict_size, emb_size = embeddings.shape
         # create fixed embeddings layer
-        self.embeddings = nn.Embedding(embeddings.shape[0], embeddings.shape[1])
+        self.embeddings = nn.Embedding(dict_size, emb_size)
         self.embeddings.weight.data.copy_(torch.from_numpy(embeddings))
         self.embeddings.weight.requires_grad = False
 
-        self.rnn = nn.LSTM(input_size=embeddings.shape[1], hidden_size=hidden_size,
+        self.rnn = nn.LSTM(input_size=emb_size, hidden_size=hidden_size,
                            batch_first=True, dropout=0.5)
-        self.out = nn.Linear(hidden_size, embeddings.shape[0])
+        if h_softmax:
+            out_size = 2**m.ceil(m.log(dict_size, 2)) - 1
+        else:
+            out_size = dict_size
+        self.out = nn.Linear(hidden_size, out_size)
 
     def forward(self, x, h=None):
         if isinstance(x, rnn_utils.PackedSequence):
@@ -46,7 +51,7 @@ class HierarchicalSoftmaxLoss(nn.Module):
     def __init__(self):
         super(HierarchicalSoftmaxLoss, self).__init__()
 
-    def forward(self, scores, class_indices):
+    def forward(self, scores, class_indices, cuda=False):
         tree_probs = torch.sigmoid(scores)
 
         batch_size, dict_size = scores.size()
@@ -55,17 +60,24 @@ class HierarchicalSoftmaxLoss(nn.Module):
         level = 1
         indices = torch.LongTensor([0]*batch_size)
         probs = Variable(torch.ones(batch_size))
+        if cuda:
+            probs = probs.cuda()
 
         while mask > 0:
+            batch_probs = []
             for batch_idx, right_branch in enumerate(map(lambda v: bool(v & mask), class_indices)):
                 if not right_branch:
                     v = tree_probs[batch_idx][indices[batch_idx]]
-                    probs[batch_idx] = probs[batch_idx] * v
-                    indices[batch_idx] += level
+                    batch_probs.append(v)
+                    indices[batch_idx] = indices[batch_idx] + level
                 else:
                     v = 1.0 - tree_probs[batch_idx][indices[batch_idx]]
-                    probs[batch_idx] = probs[batch_idx] * v
-                    indices[batch_idx] += level + 1
+                    batch_probs.append(v)
+                    indices[batch_idx] = indices[batch_idx] + level + 1
+            probs_v = torch.stack(batch_probs)
+            if cuda:
+                probs_v = probs_v.cuda()
+            probs = torch.mul(probs, probs_v)
             level <<= 1
             mask >>= 1
 

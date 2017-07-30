@@ -23,7 +23,10 @@ TRAIN_DATA_FILE = "~/work/data/experiments/quora-questions/train.csv"
 GLOVE_EMBEDDINGS = "~/work/data/experiments/glove.6B.50d.txt"
 HIDDEN_SIZE = 512
 EPOCHES = 500
-BATCH_TOKENS = 3000
+#BATCH_TOKENS = 3000
+BATCH_TOKENS = 100
+
+H_SOFTMAX = True
 
 
 if __name__ == "__main__":
@@ -42,7 +45,7 @@ if __name__ == "__main__":
     save_path = os.path.join("saves", args.name)
     if args.tiny:
         save_path += "-tiny"
-    os.makedirs(save_path, exist_ok=False)
+    os.makedirs(save_path, exist_ok=args.tiny)
 
     time_s = time.time()
     log.info("Reading training data from %s", args.train)
@@ -68,7 +71,7 @@ if __name__ == "__main__":
     log.info("Done, sample: %s -> %s", train[0], train_sequences[0])
     log.info("All preparations took %s", datetime.timedelta(seconds=time.time() - time_s))
 
-    net = model.FixedEmbeddingsModel(embeddings, HIDDEN_SIZE)
+    net = model.FixedEmbeddingsModel(embeddings, HIDDEN_SIZE, h_softmax=H_SOFTMAX)
     if args.cuda:
         net.cuda()
     lr = 0.001
@@ -79,7 +82,10 @@ if __name__ == "__main__":
         return optim.Adam(filter(lambda p: p.requires_grad, net.parameters()), lr=opt_lr)
 
     optimizer = make_optimizer(lr)
-    objective = nn.CrossEntropyLoss()
+    if H_SOFTMAX:
+        objective = model.HierarchicalSoftmaxLoss()
+    else:
+        objective = nn.CrossEntropyLoss()
 
     best_loss = None
     epoch_losses = []
@@ -94,7 +100,9 @@ if __name__ == "__main__":
             input_seq, valid_v = data.batch_to_train(batch, words, args.cuda)
             out, _ = net(input_seq)
 
-            loss_v = objective(out, valid_v)
+            if H_SOFTMAX:
+                valid_v = valid_v.data.cpu().numpy().tolist()
+            loss_v = objective(out, valid_v, cuda=args.cuda)
             loss_v.backward()
             optimizer.step()
             losses.append(loss_v.cpu().data[0])
@@ -103,9 +111,10 @@ if __name__ == "__main__":
         epoch_losses.append(loss)
 
         log.info("Epoch %d: mean_loss=%.4f, speed=%.3f item/s", epoch, loss, speed)
-        question = model.generate_question(net, words, rev_words, args.cuda)
-        print("Question on epoch %d: %s" % (epoch, " ".join(question)))
-        sys.stdout.flush()
+        if not H_SOFTMAX:
+            question = model.generate_question(net, words, rev_words, args.cuda)
+            print("Question on epoch %d: %s" % (epoch, " ".join(question)))
+            sys.stdout.flush()
         plots.plot_progress(epoch_losses, os.path.join(save_path, "status.html"))
 
         if best_loss is None or best_loss > loss:
