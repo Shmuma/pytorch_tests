@@ -66,21 +66,25 @@ class HierarchicalSoftmaxLoss(nn.Module):
         level = 1
         left_indices = []
         right_indices = []
-        cur_index = 2
+        indices = [2] * batch_size
 
         while mask > 0:
             left_list = []
             right_list = []
-            for right_branch in map(lambda v: bool(v & mask), class_indices):
+            for batch_idx, right_branch in enumerate(map(lambda v: bool(v & mask), class_indices)):
+                cur_index = indices[batch_idx]
                 if not right_branch:
                     left_list.append(cur_index)
                     right_list.append(1)
+                    cur_index <<= 1
+                    cur_index -= 1
                 else:
                     left_list.append(0)
-                    right_list.append(cur_index+1)
+                    right_list.append(cur_index)
+                    cur_index <<= 1
+                indices[batch_idx] = cur_index
             left_indices.append(left_list)
             right_indices.append(right_list)
-            cur_index += level
             level <<= 1
             mask >>= 1
 
