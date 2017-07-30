@@ -52,35 +52,47 @@ class HierarchicalSoftmaxLoss(nn.Module):
         super(HierarchicalSoftmaxLoss, self).__init__()
 
     def forward(self, scores, class_indices, cuda=False):
-        tree_probs = torch.sigmoid(scores)
-
         batch_size, dict_size = scores.size()
+        tree_probs = torch.sigmoid(scores)
+        pad = Variable(torch.ones(batch_size, 1))
+        if cuda:
+            pad = pad.cuda()
+        padded_probs = torch.cat([pad, tree_probs], dim=1)
+
         code_len = m.ceil(m.log(dict_size, 2))
         mask = 2**(code_len-1)
         level = 1
-        indices = torch.LongTensor([0]*batch_size)
-        probs = Variable(torch.ones(batch_size))
-        if cuda:
-            probs = probs.cuda()
+        left_indices = []
+        right_indices = []
+        cur_index = 1
 
         while mask > 0:
-            batch_probs = []
-            for batch_idx, right_branch in enumerate(map(lambda v: bool(v & mask), class_indices)):
+            left_list = []
+            right_list = []
+            for right_branch in map(lambda v: bool(v & mask), class_indices):
                 if not right_branch:
-                    v = tree_probs[batch_idx][indices[batch_idx]]
-                    batch_probs.append(v)
-                    indices[batch_idx] = indices[batch_idx] + level
+                    left_list.append(cur_index)
+                    right_list.append(0)
                 else:
-                    v = 1.0 - tree_probs[batch_idx][indices[batch_idx]]
-                    batch_probs.append(v)
-                    indices[batch_idx] = indices[batch_idx] + level + 1
-            probs_v = torch.stack(batch_probs)
-            if cuda:
-                probs_v = probs_v.cuda()
-            probs = torch.mul(probs, probs_v)
+                    left_list.append(0)
+                    right_list.append(cur_index+1)
+            left_indices.append(left_list)
+            right_indices.append(right_list)
+            cur_index += level
             level <<= 1
             mask >>= 1
 
+        left_t = Variable(torch.LongTensor(left_indices)).t()
+        right_t = Variable(torch.LongTensor(right_indices)).t()
+        if cuda:
+            left_t = left_t.cuda()
+            right_t = right_t.cuda()
+
+        left_part = torch.gather(padded_probs, dim=1, index=left_t)
+        left_p = torch.prod(left_part, dim=1)
+        right_part = torch.gather(padded_probs, dim=1, index=right_t)
+        right_p = torch.prod(right_part, dim=1)
+        probs = torch.mul(left_p, right_p)
         return torch.sum(-probs.log()) / batch_size
 
 
