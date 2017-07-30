@@ -1,0 +1,39 @@
+import numpy as np
+import unittest
+
+from questions import model
+
+import torch
+from torch.autograd import Variable
+
+
+class TestMisc(unittest.TestCase):
+    def test_mask(self):
+        """
+        There is no logical operations in pytorch, so, we stick to python ones
+        :return: 
+        """
+        d = [0, 1, 2, 3, 4, 5, 6, 7]
+        m = 2**1
+        r = list(map(lambda v: (v & m) != 0, d))
+
+        pass
+
+    def test_softmax(self):
+        # one batch, top note has high prob of left node, second level has right and left probs
+        scores = Variable(torch.from_numpy(np.array([[10.0, -2.0, 3.0]], dtype=np.float32)))
+        # this sample corresponds to high-prob branch, so loss should be low
+        class_indices = [int("01", base=2)]
+        hsm = model.HierarchicalSoftmaxLoss()
+        res = hsm(scores, class_indices)
+        self.assertLess(res.data.cpu().numpy()[0], 0.2)
+
+        # same scores, but sample correspond to low-prob path to tree, loss should be high
+        class_indices = [int("11", base=2)]
+        hsm = model.HierarchicalSoftmaxLoss()
+        res = hsm(scores, class_indices)
+        self.assertGreater(res.data.cpu().numpy()[0], 10.0)
+
+
+if __name__ == '__main__':
+    unittest.main()

@@ -1,3 +1,4 @@
+import math as m
 import numpy as np
 
 import torch
@@ -33,6 +34,42 @@ class FixedEmbeddingsModel(nn.Module):
         else:
             out = self.out(rnn_out[0])
         return out, rnn_hidden
+
+
+class HierarchicalSoftmaxLoss(nn.Module):
+    """
+    On input we get n-1 raw scores for binary tree (n == vocabulary size) and list of valid class indices
+    Scores are interpreted for LEFT node
+    1. apply sigmoid layer
+    2. 
+    """
+    def __init__(self):
+        super(HierarchicalSoftmaxLoss, self).__init__()
+
+    def forward(self, scores, class_indices):
+        tree_probs = torch.sigmoid(scores)
+
+        batch_size, dict_size = scores.size()
+        code_len = m.ceil(m.log(dict_size, 2))
+        mask = 2**(code_len-1)
+        level = 1
+        indices = torch.LongTensor([0]*batch_size)
+        probs = Variable(torch.ones(batch_size))
+
+        while mask > 0:
+            for batch_idx, right_branch in enumerate(map(lambda v: bool(v & mask), class_indices)):
+                if not right_branch:
+                    v = tree_probs[batch_idx][indices[batch_idx]]
+                    probs[batch_idx] = probs[batch_idx] * v
+                    indices[batch_idx] += level
+                else:
+                    v = 1.0 - tree_probs[batch_idx][indices[batch_idx]]
+                    probs[batch_idx] = probs[batch_idx] * v
+                    indices[batch_idx] += level + 1
+            level <<= 1
+            mask >>= 1
+
+        return torch.sum(-probs.log()) / batch_size
 
 
 def generate_question(net, word_dict, rev_word_dict, cuda=False):
