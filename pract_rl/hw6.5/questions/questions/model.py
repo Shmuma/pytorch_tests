@@ -89,8 +89,8 @@ class HierarchicalSoftmaxLoss(nn.Module):
             right_t = right_t.cuda()
 
         left_part = torch.gather(padded_probs, dim=1, index=left_t)
-        left_p = torch.prod(left_part, dim=1)
         right_part = torch.gather(padded_probs, dim=1, index=right_t)
+        left_p = torch.prod(left_part, dim=1)
         right_p = torch.prod(right_part, dim=1)
         probs = torch.mul(left_p, right_p)
         return torch.sum(-probs.log()) / batch_size
