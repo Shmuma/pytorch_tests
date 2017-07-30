@@ -54,17 +54,19 @@ class HierarchicalSoftmaxLoss(nn.Module):
     def forward(self, scores, class_indices, cuda=False):
         batch_size, dict_size = scores.size()
         tree_probs = torch.sigmoid(scores)
-        pad = Variable(torch.ones(batch_size, 1))
+        pad_one = Variable(torch.ones(batch_size, 1))
+        pad_zer = Variable(torch.zeros(batch_size, 1))
         if cuda:
-            pad = pad.cuda()
-        padded_probs = torch.cat([pad, tree_probs], dim=1)
+            pad_one = pad_one.cuda()
+            pad_zer = pad_zer.cuda()
+        padded_probs = torch.cat([pad_one, pad_zer, tree_probs], dim=1)
 
         code_len = m.ceil(m.log(dict_size, 2))
         mask = 2**(code_len-1)
         level = 1
         left_indices = []
         right_indices = []
-        cur_index = 1
+        cur_index = 2
 
         while mask > 0:
             left_list = []
@@ -72,7 +74,7 @@ class HierarchicalSoftmaxLoss(nn.Module):
             for right_branch in map(lambda v: bool(v & mask), class_indices):
                 if not right_branch:
                     left_list.append(cur_index)
-                    right_list.append(0)
+                    right_list.append(1)
                 else:
                     left_list.append(0)
                     right_list.append(cur_index+1)
@@ -89,7 +91,7 @@ class HierarchicalSoftmaxLoss(nn.Module):
             right_t = right_t.cuda()
 
         left_part = torch.gather(padded_probs, dim=1, index=left_t)
-        right_part = torch.gather(padded_probs, dim=1, index=right_t)
+        right_part = 1.0 - torch.gather(padded_probs, dim=1, index=right_t)
         left_p = torch.prod(left_part, dim=1)
         right_p = torch.prod(right_part, dim=1)
         probs = torch.mul(left_p, right_p)
