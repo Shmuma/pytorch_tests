@@ -24,8 +24,8 @@ TRAIN_DATA_FILE = "~/work/data/experiments/quora-questions/train.csv"
 GLOVE_EMBEDDINGS = "~/work/data/experiments/glove.6B.50d.txt"
 HIDDEN_SIZE = 512
 EPOCHES = 500
-BATCH_TOKENS = 3000
-#BATCH_TOKENS = 100
+#BATCH_TOKENS = 3000
+BATCH_TOKENS = 16
 
 # H_SOFTMAX = True
 
@@ -73,7 +73,8 @@ if __name__ == "__main__":
     log.info("All preparations took %s", datetime.timedelta(seconds=time.time() - time_s))
 
     net = model.FixedEmbeddingsModel(embeddings, HIDDEN_SIZE)
-    net_map = model.SoftmaxMappingModule(HIDDEN_SIZE, len(embeddings))
+#    net_map = model.SoftmaxMappingModule(HIDDEN_SIZE, len(embeddings))
+    net_map = model.TwoLevelSoftmaxMappingModule(HIDDEN_SIZE, len(embeddings))
     if args.cuda:
         net.cuda()
         net_map.cuda()

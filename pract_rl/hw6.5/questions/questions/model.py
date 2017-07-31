@@ -138,8 +138,8 @@ class HierarchicalSoftmaxMappingModule(nn.Module):
         return torch.sum(-probs.log()) / batch_size
 
 
-class HierarchicalTwoLevelSoftmaxLoss(nn.Module):
-    def __init__(self, dict_size, hidden_size, freq_ratio=0.2, count_of_classes=5):
+class TwoLevelSoftmaxMappingModule(MappingModule):
+    def __init__(self, input_size, dict_size, freq_ratio=0.2, count_of_classes=5):
         """
         Construct two level softmax loss. Dictionary should be ordered by decrease of frequency
         :param dict_size: count of words in the vocabulary
@@ -147,26 +147,40 @@ class HierarchicalTwoLevelSoftmaxLoss(nn.Module):
         :param freq_ratio: ratio of frequent words to keep in top-level classifier
         :param count_of_classes: how many groups to create in second level
         """
-        super(HierarchicalTwoLevelSoftmaxLoss, self).__init__()
+        super(TwoLevelSoftmaxMappingModule, self).__init__()
         self.dict_size = dict_size
-        self.hidden_size = hidden_size
+        self.input_size = input_size
         self.count_freq = int(dict_size * freq_ratio)
         self.count_of_classes = count_of_classes
 
         # build layers
-        self.level_one = nn.Linear(hidden_size, self.count_freq + self.count_of_classes)
+        self.level_one = nn.Linear(input_size, self.count_freq + self.count_of_classes)
         self.level_two = []
-        words_left = dict_size - self.level_one
+        words_left = dict_size - self.count_freq
         chunk = words_left // count_of_classes
         for idx in range(count_of_classes):
             words_left -= chunk
             this_chunk = chunk
             if words_left < chunk:
                 this_chunk += words_left
-            self.level_two.append(nn.Linear(hidden_size, this_chunk))
+            level = nn.Linear(input_size, this_chunk)
+            self.level_two.append(level)
+            # to make or level layer visible to .parameters()
+            setattr(self, "level_two_%d" % idx, level)
 
-    def forward(self, x):
+        self.sm = nn.Softmax()
+
+    def forward(self, x, valid_indices):
+        out_one = self.sm(self.level_one(x))
+        next_layer_mask = valid_indices >= self.count_freq
+        one_indices = valid_indices.clone()
+        one_indices.masked_fill_(next_layer_mask, 0)
+        one_probs = torch.masked_select(out_one, one_indices)
+#        one_probs = out_one[one_indices.data]
+
         pass
+
+
 
 
 def generate_question(net, net_map, word_dict, rev_word_dict, cuda=False):
