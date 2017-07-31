@@ -10,7 +10,10 @@ from . import data
 
 
 class FixedEmbeddingsModel(nn.Module):
-    def __init__(self, embeddings, hidden_size, h_softmax=False):
+    """
+    Model maps input indices to output of hidden size
+    """
+    def __init__(self, embeddings, hidden_size):
         super(FixedEmbeddingsModel, self).__init__()
 
         dict_size, emb_size = embeddings.shape
@@ -21,11 +24,6 @@ class FixedEmbeddingsModel(nn.Module):
 
         self.rnn = nn.LSTM(input_size=emb_size, hidden_size=hidden_size,
                            batch_first=True, dropout=0.5)
-        if h_softmax:
-            out_size = 2**m.ceil(m.log(dict_size, 2)) - 1
-        else:
-            out_size = dict_size
-        self.out = nn.Linear(hidden_size, out_size)
 
     def forward(self, x, h=None):
         if isinstance(x, rnn_utils.PackedSequence):
@@ -33,27 +31,64 @@ class FixedEmbeddingsModel(nn.Module):
             rnn_in = rnn_utils.PackedSequence(data=x_emb, batch_sizes=x.batch_sizes)
         else:
             rnn_in = self.embeddings(x)
-        rnn_out, rnn_hidden = self.rnn(rnn_in, h)
-        if isinstance(rnn_out, rnn_utils.PackedSequence):
-            out = self.out(rnn_out.data)
-        else:
-            out = self.out(rnn_out[0])
-        return out, rnn_hidden
+        return self.rnn(rnn_in, h)
 
 
-class HierarchicalSoftmaxLoss(nn.Module):
+class MappingModule(nn.Module):
     """
-    On input we get n-1 raw scores for binary tree (n == vocabulary size) and list of valid class indices
-    Scores are interpreted for LEFT node
-    1. apply sigmoid layer
-    2.
+    Base parent for language model output with methods:
+    1. forward() -> returns loss for batch
+    2. infer() -> returns indices for inferred words
+    """
+    def forward(self, x, valid_indices):
+        raise NotImplemented
+
+    def infer(self, x):
+        raise NotImplemented
+
+#
+class SoftmaxMappingModule(MappingModule):
+    """
+    Classical softmax
+    """
+    def __init__(self, input_size, embeddings_size):
+        super(SoftmaxMappingModule, self).__init__()
+        self.out = nn.Linear(input_size, embeddings_size)
+        self.loss = nn.CrossEntropyLoss()
+        self.sm = nn.Softmax()
+
+    def forward(self, x, valid_indices):
+        """
+        Calculate cross entropy loss
+        :param x: input vector
+        :param valid_indices: valid indices
+        :return: loss
+        """
+        predicted = self.out(x)
+        return self.loss(predicted, valid_indices)
+
+    def infer(self, x):
+        """
+        From net's output return indices of predicted words
+        :param x: batch of outputs
+        :return:
+        """
+        out = self.out(x)
+        out = self.sm(out)
+        res = torch.multinomial(out, 1)
+        return res
+
+
+class HierarchicalSoftmaxMappingModule(nn.Module):
+    """
+    Build full tree for hierarchical softmax. Not the best option from performance point of view,
+    but wasted too much time making it working, so, let's keep it here :)
     """
     def __init__(self):
-        super(HierarchicalSoftmaxLoss, self).__init__()
+        super(HierarchicalSoftmaxMappingModule, self).__init__()
 
     def forward(self, scores, class_indices, cuda=False):
         batch_size, dict_size = scores.size()
-#        tree_probs = torch.sigmoid(scores)
         # without initial sigmoid, our predefined values should be large and small vals
         pad_one = Variable(torch.ones(batch_size, 1) * 100.0)
         pad_zer = Variable(torch.ones(batch_size, 1) * (-100.0))
@@ -134,31 +169,31 @@ class HierarchicalTwoLevelSoftmaxLoss(nn.Module):
         pass
 
 
-def generate_question(net, word_dict, rev_word_dict, cuda=False):
+def generate_question(net, net_map, word_dict, rev_word_dict, cuda=False):
     """
     Sample question from model
     :param net: model to used
+    :param net_map: mapping module to get word index
     :param word_dict: word -> idx mapping
     :param rev_word_dict: idx -> word mapping
     :return: list of question tokens
     """
     assert isinstance(net, nn.Module)
+    assert isinstance(net_map, MappingModule)
     assert isinstance(word_dict, dict)
     assert isinstance(rev_word_dict, dict)
 
     result = []
     hidden = None
     token = data.END_TOKEN
-    sm = nn.Softmax()
 
     while len(result) < 200:
         token_v = Variable(torch.LongTensor([[word_dict[token]]]))
         if cuda:
             token_v = token_v.cuda()
         out, hidden = net(token_v, hidden)
-        out = sm(out)
-        out = out.data.cpu().numpy()
-        idx = np.random.choice(len(word_dict), p=out[0])
+        idx = net_map.infer(out[0])
+        idx = idx.data.cpu().numpy()[0][0]
         token = rev_word_dict[idx]
         if token == data.END_TOKEN:
             break

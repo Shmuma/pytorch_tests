@@ -24,13 +24,13 @@ class TestMisc(unittest.TestCase):
         scores = Variable(torch.from_numpy(np.array([[10.0, -2.0, 3.0]], dtype=np.float32)))
         # this sample corresponds to high-prob branch, so loss should be low
         class_indices = [int("01", base=2)]
-        hsm = model.HierarchicalSoftmaxLoss()
+        hsm = model.HierarchicalSoftmaxMappingModule()
         res = hsm(scores, class_indices)
         self.assertAlmostEqual(res.data.cpu().numpy()[0], 0.1270, places=3)
 
         # same scores, but sample correspond to low-prob path to tree, loss should be high
         class_indices = [int("11", base=2)]
-        hsm = model.HierarchicalSoftmaxLoss()
+        hsm = model.HierarchicalSoftmaxMappingModule()
         res = hsm(scores, class_indices)
         self.assertAlmostEqual(res.data.cpu().numpy()[0], 13.0482, places=3)
 
