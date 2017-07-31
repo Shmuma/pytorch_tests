@@ -158,7 +158,6 @@ class TwoLevelSoftmaxMappingModule(MappingModule):
 
         # build layers
         self.level_one = nn.Linear(input_size, self.count_freq + self.count_of_classes)
-#        self.level_two = []
         self.level_two_sizes = []
         words_left = dict_size - self.count_freq
         chunk = words_left // count_of_classes
@@ -168,9 +167,7 @@ class TwoLevelSoftmaxMappingModule(MappingModule):
             if words_left < chunk:
                 this_chunk += words_left
             level = nn.Linear(input_size, this_chunk)
-#            self.level_two.append(level)
             self.level_two_sizes.append(this_chunk)
-            # to make or level layer visible to .parameters()
             setattr(self, "level_two_%d" % idx, level)
 
         self.sm = nn.Softmax()
@@ -202,14 +199,7 @@ class TwoLevelSoftmaxMappingModule(MappingModule):
             data_bound = new_bound
             index_bound += class_size
 
-        # one_indices = sorted_valid_indices.clone()
-        # one_indices.masked_fill_(next_layer_mask, 0)
-        # one_probs = torch.masked_select(out_one, one_indices)
-#        one_probs = out_one[one_indices.data]
-
         return loss / x.size()[0]
-
-
 
 
 def generate_question(net, net_map, word_dict, rev_word_dict, cuda=False):
