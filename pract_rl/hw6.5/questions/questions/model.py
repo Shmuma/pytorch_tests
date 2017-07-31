@@ -1,3 +1,4 @@
+import logging
 import math as m
 import numpy as np
 
@@ -139,7 +140,9 @@ class HierarchicalSoftmaxMappingModule(nn.Module):
 
 
 class TwoLevelSoftmaxMappingModule(MappingModule):
-    def __init__(self, input_size, dict_size, freq_ratio=0.2, count_of_classes=5):
+    log = logging.getLogger("TwoLevelSoftmaxMappingModule")
+
+    def __init__(self, input_size, dict_size, freq_ratio=0.2, count_of_classes=2):
         """
         Construct two level softmax loss. Dictionary should be ordered by decrease of frequency
         :param dict_size: count of words in the vocabulary
@@ -155,7 +158,8 @@ class TwoLevelSoftmaxMappingModule(MappingModule):
 
         # build layers
         self.level_one = nn.Linear(input_size, self.count_freq + self.count_of_classes)
-        self.level_two = []
+#        self.level_two = []
+        self.level_two_sizes = []
         words_left = dict_size - self.count_freq
         chunk = words_left // count_of_classes
         for idx in range(count_of_classes):
@@ -164,21 +168,46 @@ class TwoLevelSoftmaxMappingModule(MappingModule):
             if words_left < chunk:
                 this_chunk += words_left
             level = nn.Linear(input_size, this_chunk)
-            self.level_two.append(level)
+#            self.level_two.append(level)
+            self.level_two_sizes.append(this_chunk)
             # to make or level layer visible to .parameters()
             setattr(self, "level_two_%d" % idx, level)
 
         self.sm = nn.Softmax()
+        self.ce = nn.CrossEntropyLoss(size_average=False)
 
     def forward(self, x, valid_indices):
-        out_one = self.sm(self.level_one(x))
-        next_layer_mask = valid_indices >= self.count_freq
-        one_indices = valid_indices.clone()
-        one_indices.masked_fill_(next_layer_mask, 0)
-        one_probs = torch.masked_select(out_one, one_indices)
+        # sort input according to indices, which makes our classes continuous
+        sorted_valid_indices, sorted_indexes = torch.sort(valid_indices, dim=0)
+        sorted_x = x[sorted_indexes.data]
+
+        out_one = self.sm(self.level_one(sorted_x))
+        data_bound = (sorted_valid_indices < self.count_freq).long().sum()
+        data_bound = data_bound.data.cpu().numpy()[0]
+        loss = self.ce(out_one[:data_bound], sorted_valid_indices[:data_bound])
+
+        index_bound = self.count_freq
+
+        for class_idx, class_size in enumerate(self.level_two_sizes):
+            new_bound = (sorted_valid_indices < (index_bound + class_size)).long().sum()
+            new_bound = new_bound.data.cpu().numpy()[0]
+            # we don't have more samples
+            if data_bound == new_bound:
+                break
+            conv = getattr(self, "level_two_%d" % class_idx)
+            out_two = self.sm(conv(sorted_x[data_bound:new_bound]))
+            loss += self.ce(out_two, sorted_valid_indices[data_bound:new_bound] - index_bound)
+            class_loss = torch.sum(-(out_one[data_bound:new_bound, self.count_freq + class_idx]).log())
+            loss += class_loss
+            data_bound = new_bound
+            index_bound += class_size
+
+        # one_indices = sorted_valid_indices.clone()
+        # one_indices.masked_fill_(next_layer_mask, 0)
+        # one_probs = torch.masked_select(out_one, one_indices)
 #        one_probs = out_one[one_indices.data]
 
-        pass
+        return loss / x.size()[0]
 
 
 

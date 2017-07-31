@@ -24,8 +24,8 @@ TRAIN_DATA_FILE = "~/work/data/experiments/quora-questions/train.csv"
 GLOVE_EMBEDDINGS = "~/work/data/experiments/glove.6B.50d.txt"
 HIDDEN_SIZE = 512
 EPOCHES = 500
-#BATCH_TOKENS = 3000
-BATCH_TOKENS = 16
+BATCH_TOKENS = 3000
+#BATCH_TOKENS = 16
 
 # H_SOFTMAX = True
 
@@ -110,10 +110,9 @@ if __name__ == "__main__":
         epoch_losses.append(loss)
 
         log.info("Epoch %d: mean_loss=%.4f, speed=%.3f item/s", epoch, loss, speed)
-        # if not H_SOFTMAX:
-        question = model.generate_question(net, net_map, words, rev_words, args.cuda)
-        print("Question on epoch %d: %s" % (epoch, " ".join(question)))
-        sys.stdout.flush()
+        # question = model.generate_question(net, net_map, words, rev_words, args.cuda)
+        # print("Question on epoch %d: %s" % (epoch, " ".join(question)))
+        # sys.stdout.flush()
         plots.plot_progress(epoch_losses, os.path.join(save_path, "status.html"))
 
         if best_loss is None or best_loss > loss:

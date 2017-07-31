@@ -27,17 +27,22 @@ def read_embeddings(file_name, train_tokens=None):
         for tokens in train_tokens:
             whitelist.update(tokens)
 
+    end_token_added = False
     with open(file_name, "rt", encoding='utf-8') as fd:
+
         for l in fd:
             word, rest = l.split(' ', maxsplit=1)
+
             if whitelist is None or word in whitelist:
                 rest = rest.split(' ')
+
+                if not end_token_added:
+                    words[END_TOKEN] = len(words)
+                    vectors.append(np.zeros((len(rest))))
+                    end_token_added = True
+
                 words[word] = len(words)
                 vectors.append(list(map(float, rest)))
-        # words[START_TOKEN] = len(words)
-        # vectors.append(np.ones((len(vectors[0], ))))
-        words[END_TOKEN] = len(words)
-        vectors.append(np.zeros((len(vectors[0], ))))
 
     return words, np.array(vectors)
 
