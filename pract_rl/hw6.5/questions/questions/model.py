@@ -46,7 +46,7 @@ class HierarchicalSoftmaxLoss(nn.Module):
     On input we get n-1 raw scores for binary tree (n == vocabulary size) and list of valid class indices
     Scores are interpreted for LEFT node
     1. apply sigmoid layer
-    2. 
+    2.
     """
     def __init__(self):
         super(HierarchicalSoftmaxLoss, self).__init__()
@@ -103,12 +103,43 @@ class HierarchicalSoftmaxLoss(nn.Module):
         return torch.sum(-probs.log()) / batch_size
 
 
+class HierarchicalTwoLevelSoftmaxLoss(nn.Module):
+    def __init__(self, dict_size, hidden_size, freq_ratio=0.2, count_of_classes=5):
+        """
+        Construct two level softmax loss. Dictionary should be ordered by decrease of frequency
+        :param dict_size: count of words in the vocabulary
+        :param hidden_size: size of input from hidden layer
+        :param freq_ratio: ratio of frequent words to keep in top-level classifier
+        :param count_of_classes: how many groups to create in second level
+        """
+        super(HierarchicalTwoLevelSoftmaxLoss, self).__init__()
+        self.dict_size = dict_size
+        self.hidden_size = hidden_size
+        self.count_freq = int(dict_size * freq_ratio)
+        self.count_of_classes = count_of_classes
+
+        # build layers
+        self.level_one = nn.Linear(hidden_size, self.count_freq + self.count_of_classes)
+        self.level_two = []
+        words_left = dict_size - self.level_one
+        chunk = words_left // count_of_classes
+        for idx in range(count_of_classes):
+            words_left -= chunk
+            this_chunk = chunk
+            if words_left < chunk:
+                this_chunk += words_left
+            self.level_two.append(nn.Linear(hidden_size, this_chunk))
+
+    def forward(self, x):
+        pass
+
+
 def generate_question(net, word_dict, rev_word_dict, cuda=False):
     """
     Sample question from model
     :param net: model to used
-    :param word_dict: word -> idx mapping 
-    :param rev_word_dict: idx -> word mapping 
+    :param word_dict: word -> idx mapping
+    :param rev_word_dict: idx -> word mapping
     :return: list of question tokens
     """
     assert isinstance(net, nn.Module)
