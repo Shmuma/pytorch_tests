@@ -178,10 +178,10 @@ class TwoLevelSoftmaxMappingModule(MappingModule):
         sorted_valid_indices, sorted_indexes = torch.sort(valid_indices, dim=0)
         sorted_x = x[sorted_indexes.data]
 
-        out_one = self.sm(self.level_one(sorted_x))
         data_bound = (sorted_valid_indices < self.count_freq).long().sum()
         data_bound = data_bound.data.cpu().numpy()[0]
-        loss = self.ce(out_one[:data_bound], sorted_valid_indices[:data_bound])
+        out_one = self.sm(self.level_one(sorted_x[:data_bound]))
+        loss = self.ce(out_one, sorted_valid_indices[:data_bound])
 
         index_bound = self.count_freq
 
@@ -193,16 +193,14 @@ class TwoLevelSoftmaxMappingModule(MappingModule):
                 break
             conv = getattr(self, "level_two_%d" % class_idx)
             out_two = self.sm(conv(sorted_x[data_bound:new_bound]))
-            #loss += self.ce(out_two, sorted_valid_indices[data_bound:new_bound] - index_bound)
             indices = sorted_valid_indices[data_bound:new_bound] - index_bound
             indices = torch.unsqueeze(indices, dim=1)
             l2_probs = torch.gather(out_two, dim=1, index=indices).squeeze()
-            l1_probs = out_one[data_bound:new_bound]
+            l1_probs = self.sm(self.level_one(sorted_x[data_bound:new_bound]))
             l1_probs = l1_probs[:, self.count_freq + class_idx]
             probs = torch.mul(l2_probs, l1_probs)
             probs = -torch.log(probs)
             loss += torch.sum(probs)
-            # class_loss = torch.sum(-(out_one[data_bound:new_bound, self.count_freq + class_idx]).log())
             # loss += class_loss
             data_bound = new_bound
             index_bound += class_size
