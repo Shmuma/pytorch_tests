@@ -162,7 +162,7 @@ class TwoLevelSoftmaxMappingModule(MappingModule):
         chunk = self.count_freq
         idx = 0
         while words_left > 0:
-            chunk *= class_size_mul
+            chunk = int(chunk * class_size_mul)
             words_left -= chunk
             this_chunk = chunk
             # make last chunk larger
