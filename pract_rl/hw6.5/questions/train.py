@@ -74,7 +74,7 @@ if __name__ == "__main__":
 
     net = model.FixedEmbeddingsModel(embeddings, HIDDEN_SIZE)
 #    net_map = model.SoftmaxMappingModule(HIDDEN_SIZE, len(embeddings))
-    net_map = model.TwoLevelSoftmaxMappingModule(HIDDEN_SIZE, len(embeddings), freq_ratio=0.03, count_of_classes=4)
+    net_map = model.TwoLevelSoftmaxMappingModule(HIDDEN_SIZE, len(embeddings), freq_ratio=0.03)
     if args.cuda:
         net.cuda()
         net_map.cuda()

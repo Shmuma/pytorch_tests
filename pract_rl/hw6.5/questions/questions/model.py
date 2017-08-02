@@ -142,34 +142,40 @@ class HierarchicalSoftmaxMappingModule(nn.Module):
 class TwoLevelSoftmaxMappingModule(MappingModule):
     log = logging.getLogger("TwoLevelSoftmaxMappingModule")
 
-    def __init__(self, input_size, dict_size, freq_ratio=0.2, count_of_classes=2):
+    def __init__(self, input_size, dict_size, freq_ratio=0.2, class_size_mul=2):
         """
         Construct two level softmax loss. Dictionary should be ordered by decrease of frequency
         :param dict_size: count of words in the vocabulary
         :param hidden_size: size of input from hidden layer
         :param freq_ratio: ratio of frequent words to keep in top-level classifier
-        :param count_of_classes: how many groups to create in second level
+        :param class_size_mul: multiplier for next class size
         """
         super(TwoLevelSoftmaxMappingModule, self).__init__()
         self.dict_size = dict_size
         self.input_size = input_size
         self.count_freq = int(dict_size * freq_ratio)
-        self.count_of_classes = count_of_classes
 
         # build layers
-        self.level_one = nn.Linear(input_size, self.count_freq + self.count_of_classes)
         self.level_two_sizes = []
-        if count_of_classes > 0:
-            words_left = dict_size - self.count_freq
-            chunk = words_left // count_of_classes
-            for idx in range(count_of_classes):
-                words_left -= chunk
-                this_chunk = chunk
-                if words_left < chunk:
-                    this_chunk += words_left
-                level = nn.Linear(input_size, this_chunk)
-                self.level_two_sizes.append(this_chunk)
-                setattr(self, "level_two_%d" % idx, level)
+
+        words_left = dict_size - self.count_freq
+        chunk = self.count_freq
+        idx = 0
+        while words_left > 0:
+            chunk *= class_size_mul
+            words_left -= chunk
+            this_chunk = chunk
+            # make last chunk larger
+            if words_left < chunk:
+                this_chunk += words_left
+                words_left = 0
+            level = nn.Linear(input_size, this_chunk)
+            self.level_two_sizes.append(this_chunk)
+            setattr(self, "level_two_%d" % idx, level)
+            idx += 1
+
+        self.count_of_classes = len(self.level_two_sizes)
+        self.level_one = nn.Linear(input_size, self.count_freq + self.count_of_classes)
 
         self.sm = nn.Softmax()
         self.ce = nn.CrossEntropyLoss(size_average=False)
