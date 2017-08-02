@@ -172,6 +172,7 @@ class TwoLevelSoftmaxMappingModule(MappingModule):
 
         self.sm = nn.Softmax()
         self.ce = nn.CrossEntropyLoss(size_average=False)
+        self.log.info("L1 size=%d, L2 classes=%s", self.count_freq, self.level_two_sizes)
 
     def forward(self, x, valid_indices):
         # sort input according to indices, which makes our classes continuous
