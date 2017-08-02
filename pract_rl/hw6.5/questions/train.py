@@ -78,9 +78,9 @@ if __name__ == "__main__":
     if args.cuda:
         net.cuda()
         net_map.cuda()
-    lr = 0.001
+    lr = 0.005
     lr_decay = 0.9
-    lr_decay_epoches = 50
+    lr_decay_epoches = 20
 
     def make_optimizer(opt_lr):
         return optim.Adam(filter(lambda p: p.requires_grad, itertools.chain(net.parameters(), net_map.parameters())),
