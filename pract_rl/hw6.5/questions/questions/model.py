@@ -219,6 +219,34 @@ class TwoLevelSoftmaxMappingModule(MappingModule):
 
         return loss / x.size()[0]
 
+    def _get_bounds(self, sorted_indices):
+        """
+        From sorted indices, return list of bounds for our classes
+        :param sorted_indices: long tensor or variable
+        :return: list of tuples with (index_offset, data_offset)
+        """
+        res = []
+        index_offset = 0
+
+        for class_size in [self.count_freq] + self.level_two_sizes:
+            data_bound = (sorted_indices < (index_offset + class_size)).long().sum()
+            data_bound = data_bound.data.cpu().numpy()[0]
+            res.append((index_offset, data_bound))
+            index_offset += class_size
+
+        return res
+
+    def infer(self, x):
+        words_indices = torch.multinomial(self.sm(self.level_one(x)), 1)
+        if self.count_of_classes == 0:
+            return words_indices
+
+        sorted_words_indices, sorted_idx = torch.sort(words_indices, dim=0)
+        sorted_x = x[sorted_idx.data]
+
+        data_bound = (sorted_words_indices < self.count_freq).long().sum()
+        data_bound = data_bound
+
 
 def generate_question(net, net_map, word_dict, rev_word_dict, cuda=False):
     """
