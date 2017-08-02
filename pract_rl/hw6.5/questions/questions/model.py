@@ -176,13 +176,17 @@ class TwoLevelSoftmaxMappingModule(MappingModule):
         self.log.info("L1 size=%d, L2 classes=%s", self.count_freq, self.level_two_sizes)
 
     def forward(self, x, valid_indices):
+        # degraded case
+        if self.count_of_classes == 0:
+            return self.ce(self.level_one(x), valid_indices) / x.size()[0]
+
         # sort input according to indices, which makes our classes continuous
         sorted_valid_indices, sorted_indexes = torch.sort(valid_indices, dim=0)
         sorted_x = x[sorted_indexes.data]
 
         data_bound = (sorted_valid_indices < self.count_freq).long().sum()
         data_bound = data_bound.data.cpu().numpy()[0]
-        out_one = self.sm(self.level_one(sorted_x[:data_bound]))
+        out_one = self.level_one(sorted_x[:data_bound])
         loss = self.ce(out_one, sorted_valid_indices[:data_bound])
 
         index_bound = self.count_freq
@@ -203,15 +207,12 @@ class TwoLevelSoftmaxMappingModule(MappingModule):
             probs = torch.mul(l2_probs, l1_probs)
             probs = -torch.log(probs)
             loss += torch.sum(probs)
-            # loss += class_loss
+
             data_bound = new_bound
             index_bound += class_size
 
         return loss / x.size()[0]
 
-    def debug(self):
-        s = self.level_one.weight.sum().data.cpu().numpy()[0]
-        self.log.info("L1 sum: %s", s)
 
 def generate_question(net, net_map, word_dict, rev_word_dict, cuda=False):
     """

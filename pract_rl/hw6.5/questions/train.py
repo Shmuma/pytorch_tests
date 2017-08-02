@@ -74,7 +74,7 @@ if __name__ == "__main__":
 
     net = model.FixedEmbeddingsModel(embeddings, HIDDEN_SIZE)
 #    net_map = model.SoftmaxMappingModule(HIDDEN_SIZE, len(embeddings))
-    net_map = model.TwoLevelSoftmaxMappingModule(HIDDEN_SIZE, len(embeddings), freq_ratio=1.0, count_of_classes=0)
+    net_map = model.TwoLevelSoftmaxMappingModule(HIDDEN_SIZE, len(embeddings), freq_ratio=0.1, count_of_classes=2)
     if args.cuda:
         net.cuda()
         net_map.cuda()
@@ -94,8 +94,6 @@ if __name__ == "__main__":
     for epoch in range(EPOCHES):
         time_s = time.time()
         losses = []
-        # if hasattr(net_map, 'debug'):
-        #     net_map.debug()
 
         for batch in tqdm(data.iterate_batches(train_sequences, BATCH_TOKENS),
                           total=total_tokens // BATCH_TOKENS):
