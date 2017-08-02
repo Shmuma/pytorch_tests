@@ -159,16 +159,17 @@ class TwoLevelSoftmaxMappingModule(MappingModule):
         # build layers
         self.level_one = nn.Linear(input_size, self.count_freq + self.count_of_classes)
         self.level_two_sizes = []
-        words_left = dict_size - self.count_freq
-        chunk = words_left // count_of_classes
-        for idx in range(count_of_classes):
-            words_left -= chunk
-            this_chunk = chunk
-            if words_left < chunk:
-                this_chunk += words_left
-            level = nn.Linear(input_size, this_chunk)
-            self.level_two_sizes.append(this_chunk)
-            setattr(self, "level_two_%d" % idx, level)
+        if count_of_classes > 0:
+            words_left = dict_size - self.count_freq
+            chunk = words_left // count_of_classes
+            for idx in range(count_of_classes):
+                words_left -= chunk
+                this_chunk = chunk
+                if words_left < chunk:
+                    this_chunk += words_left
+                level = nn.Linear(input_size, this_chunk)
+                self.level_two_sizes.append(this_chunk)
+                setattr(self, "level_two_%d" % idx, level)
 
         self.sm = nn.Softmax()
         self.ce = nn.CrossEntropyLoss(size_average=False)
