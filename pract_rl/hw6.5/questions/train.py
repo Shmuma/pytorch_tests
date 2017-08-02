@@ -24,7 +24,7 @@ TRAIN_DATA_FILE = "~/work/data/experiments/quora-questions/train.csv"
 GLOVE_EMBEDDINGS = "~/work/data/experiments/glove.6B.50d.txt"
 HIDDEN_SIZE = 512
 EPOCHES = 500
-BATCH_TOKENS = 40000
+BATCH_TOKENS = 50000
 #BATCH_TOKENS = 16
 
 # H_SOFTMAX = True
@@ -80,7 +80,7 @@ if __name__ == "__main__":
         net_map.cuda()
     lr = 0.001
     lr_decay = 0.9
-    lr_decay_epoches = 100
+    lr_decay_epoches = 50
 
     def make_optimizer(opt_lr):
         return optim.Adam(filter(lambda p: p.requires_grad, itertools.chain(net.parameters(), net_map.parameters())),
