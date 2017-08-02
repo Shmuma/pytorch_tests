@@ -94,10 +94,13 @@ if __name__ == "__main__":
     for epoch in range(EPOCHES):
         time_s = time.time()
         losses = []
+        # if hasattr(net_map, 'debug'):
+        #     net_map.debug()
 
         for batch in tqdm(data.iterate_batches(train_sequences, BATCH_TOKENS),
                           total=total_tokens // BATCH_TOKENS):
             net.zero_grad()
+            net_map.zero_grad()
             input_seq, valid_v = data.batch_to_train(batch, words, args.cuda)
             out, _ = net(input_seq)
             # output is PackedSequence, so, we need to pass .data field

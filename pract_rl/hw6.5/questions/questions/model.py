@@ -208,6 +208,9 @@ class TwoLevelSoftmaxMappingModule(MappingModule):
 
         return loss / x.size()[0]
 
+    def debug(self):
+        s = self.level_one.weight.sum().data.cpu().numpy()[0]
+        self.log.info("L1 sum: %s", s)
 
 def generate_question(net, net_map, word_dict, rev_word_dict, cuda=False):
     """
