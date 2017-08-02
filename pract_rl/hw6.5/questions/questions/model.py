@@ -21,7 +21,7 @@ class FixedEmbeddingsModel(nn.Module):
         # create fixed embeddings layer
         self.embeddings = nn.Embedding(dict_size, emb_size)
         self.embeddings.weight.data.copy_(torch.from_numpy(embeddings))
-        self.embeddings.weight.requires_grad = False
+        self.embeddings.weight.requires_grad = True
 
         self.rnn = nn.LSTM(input_size=emb_size, hidden_size=hidden_size,
                            batch_first=True, dropout=0.5)
