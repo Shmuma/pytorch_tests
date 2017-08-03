@@ -78,7 +78,7 @@ if __name__ == "__main__":
     if args.cuda:
         net.cuda()
         net_map.cuda()
-    lr = 0.005
+    lr = 0.01
     lr_decay = 0.9
     lr_decay_epoches = 20
 
