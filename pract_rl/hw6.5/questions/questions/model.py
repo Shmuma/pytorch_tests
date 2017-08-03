@@ -200,19 +200,17 @@ class TwoLevelSoftmaxMappingModule(MappingModule):
         for class_idx, class_size in enumerate(self.level_two_sizes):
             new_bound = (sorted_valid_indices < (index_bound + class_size)).long().sum()
             new_bound = new_bound.data.cpu().numpy()[0]
-            # we don't have more samples
-            if data_bound == new_bound:
-                break
-            conv = getattr(self, "level_two_%d" % class_idx)
-            out_two = self.sm(conv(sorted_x[data_bound:new_bound]))
-            indices = sorted_valid_indices[data_bound:new_bound] - index_bound
-            indices = torch.unsqueeze(indices, dim=1)
-            l2_probs = torch.gather(out_two, dim=1, index=indices).squeeze()
-            l1_probs = self.sm(self.level_one(sorted_x[data_bound:new_bound]))
-            l1_probs = l1_probs[:, self.count_freq + class_idx]
-            probs = torch.mul(l2_probs, l1_probs)
-            probs = -torch.log(probs)
-            loss += torch.sum(probs)
+            if data_bound < new_bound:
+                conv = getattr(self, "level_two_%d" % class_idx)
+                out_two = self.sm(conv(sorted_x[data_bound:new_bound]))
+                indices = sorted_valid_indices[data_bound:new_bound] - index_bound
+                indices = torch.unsqueeze(indices, dim=1)
+                l2_probs = torch.gather(out_two, dim=1, index=indices).squeeze()
+                l1_probs = self.sm(self.level_one(sorted_x[data_bound:new_bound]))
+                l1_probs = l1_probs[:, self.count_freq + class_idx]
+                probs = torch.mul(l2_probs, l1_probs)
+                probs = -torch.log(probs)
+                loss += torch.sum(probs)
 
             data_bound = new_bound
             index_bound += class_size
@@ -244,9 +242,16 @@ class TwoLevelSoftmaxMappingModule(MappingModule):
         sorted_words_indices, sorted_idx = torch.sort(words_indices, dim=0)
         sorted_x = x[sorted_idx.data]
 
-        data_bound = (sorted_words_indices < self.count_freq).long().sum()
-        data_bound = data_bound
+        prev_bound = 0
+        for idx, (offset, bound) in enumerate(self._get_bounds(sorted_words_indices)):
+            # first bound we just skip, as l1 indices are already filled
+            if idx != 0 and bound > prev_bound:
+                conv = getattr(self, "level_two_%d" % (idx-1))
+                level_indices = torch.multinomial(self.sm(conv(sorted_x[prev_bound:bound])), 1)
+                # fill appropirate indices
+            prev_bound = bound
 
+        words_indices
 
 def generate_question(net, net_map, word_dict, rev_word_dict, cuda=False):
     """
