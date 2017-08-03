@@ -201,7 +201,7 @@ class TwoLevelSoftmaxMappingModule(MappingModule):
             new_bound = (sorted_valid_indices < (index_bound + class_size)).long().sum()
             new_bound = new_bound.data.cpu().numpy()[0]
             if data_bound < new_bound:
-                conv = getattr(self, "level_two_%d" % class_idx)
+                conv = self._get_l2(class_idx)
                 out_two = self.sm(conv(sorted_x[data_bound:new_bound]))
                 indices = sorted_valid_indices[data_bound:new_bound] - index_bound
                 indices = torch.unsqueeze(indices, dim=1)
@@ -216,6 +216,9 @@ class TwoLevelSoftmaxMappingModule(MappingModule):
             index_bound += class_size
 
         return loss / x.size()[0]
+
+    def _get_l2(self, index):
+        return getattr(self, "level_two_%d" % index)
 
     def _get_bounds(self, sorted_indices):
         """
@@ -235,23 +238,26 @@ class TwoLevelSoftmaxMappingModule(MappingModule):
         return res
 
     def infer(self, x):
+        """
+        We assume that x contains single element and not a batch
+        :param x: hidden state
+        :return: output with indices
+        """
         words_indices = torch.multinomial(self.sm(self.level_one(x)), 1)
         if self.count_of_classes == 0:
             return words_indices
 
-        sorted_words_indices, sorted_idx = torch.sort(words_indices, dim=0)
-        sorted_x = x[sorted_idx.data]
+        word_idx = words_indices.data.cpu().numpy()[0][0]
+        if word_idx < self.count_freq:
+            return words_indices
 
-        prev_bound = 0
-        for idx, (offset, bound) in enumerate(self._get_bounds(sorted_words_indices)):
-            # first bound we just skip, as l1 indices are already filled
-            if idx != 0 and bound > prev_bound:
-                conv = getattr(self, "level_two_%d" % (idx-1))
-                level_indices = torch.multinomial(self.sm(conv(sorted_x[prev_bound:bound])), 1)
-                # fill appropirate indices
-            prev_bound = bound
+        class_idx = word_idx - self.count_freq
+        conv = self._get_l2(class_idx)
+        level_indices = torch.multinomial(self.sm(conv(x)), 1)
+        level_indices += self.count_freq + sum(self.level_two_sizes[:class_idx])
 
-        words_indices
+        return level_indices
+
 
 def generate_question(net, net_map, word_dict, rev_word_dict, cuda=False):
     """
