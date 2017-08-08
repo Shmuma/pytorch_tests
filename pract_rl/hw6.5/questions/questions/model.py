@@ -303,13 +303,13 @@ class SampledSoftmaxMappingModule(MappingModule):
         return loss
 
     def infer(self, x):
-        out = self.out.weight(x)
+        out = x.mm(self.out.weight.t())
         out = self.sm(out)
         res = torch.multinomial(out, 1)
         return res
 
 
-def generate_question(net, net_map, word_dict, rev_word_dict, cuda=False):
+def generate_question(net, net_map, word_dict, rev_word_dict, cuda=False, empty_ok=False, max_attempts=100):
     """
     Sample question from model
     :param net: model to used
@@ -323,20 +323,22 @@ def generate_question(net, net_map, word_dict, rev_word_dict, cuda=False):
     assert isinstance(word_dict, dict)
     assert isinstance(rev_word_dict, dict)
 
-    result = []
-    hidden = None
-    token = data.END_TOKEN
-
-    while len(result) < 200:
-        token_v = Variable(torch.LongTensor([[word_dict[token]]]))
-        if cuda:
-            token_v = token_v.cuda()
-        out, hidden = net(token_v, hidden)
-        idx = net_map.infer(out[0])
-        idx = idx.data.cpu().numpy()[0][0]
-        token = rev_word_dict[idx]
-        if token == data.END_TOKEN:
-            break
-        result.append(token)
+    for _ in range(max_attempts):
+        result = []
+        hidden = None
+        token = data.END_TOKEN
+        while len(result) < 200:
+            token_v = Variable(torch.LongTensor([[word_dict[token]]]))
+            if cuda:
+                token_v = token_v.cuda()
+            out, hidden = net(token_v, hidden)
+            idx = net_map.infer(out[0])
+            idx = idx.data.cpu().numpy()[0][0]
+            token = rev_word_dict[idx]
+            if token == data.END_TOKEN:
+                break
+            result.append(token)
+        if result or empty_ok:
+            return result
 
     return result
