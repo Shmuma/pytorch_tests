@@ -259,6 +259,45 @@ class TwoLevelSoftmaxMappingModule(MappingModule):
         return level_indices
 
 
+class SampledSoftmaxMappingModule(MappingModule):
+    log = logging.getLogger('SampledSoftmaxMappingModule')
+
+    def __init__(self, input_size, dict_size, samples_count=5):
+        """
+        Construct sampled softmax mapping module
+        :param input_size: input dimension 
+        :param dict_size: count of words in vocabulary
+        :param samples_count: count of extra random word samples
+        """
+        super(SampledSoftmaxMappingModule, self).__init__()
+        self.input_size = input_size
+        self.dict_size = dict_size
+        self.samples_count = samples_count
+
+        self.out = nn.Embedding(dict_size, input_size)
+        self.sm = nn.Softmax()
+        self.ce = nn.CrossEntropyLoss()
+
+    def forward(self, x, valid_indices):
+        # create randomly-sampled indices to augment our valid data
+        samples_indices = np.random.randint(low=0, high=self.dict_size,
+                                            size=(valid_indices.size()[0], self.samples_count))
+        samples_indices_v = Variable(torch.from_numpy(samples_indices))
+        indices = torch.cat([torch.unsqueeze(valid_indices, dim=1), samples_indices_v], dim=1)
+        emb_vals = self.out(indices)
+        # here we have tensor (batch*samples+1*hidden)
+        # now we do scalar multiplication of every row from X to our embedding matrix (with broadcast)
+        # this gives us batch*samples+1 numbers which is our sampled scores
+        xx = torch.unsqueeze(x, dim=1)
+        xx = xx.expand(x.size()[0], emb_vals.size()[1], xx.size()[2])
+        scores = torch.mul(emb_vals, xx)
+        scores = scores.sum(dim=2)
+        scores = scores.squeeze(dim=2)
+        probs = self.sm(scores)
+        ce_indices = Variable(torch.LongTensor([0]*valid_indices.size()[0]))
+        loss = self.ce(probs, ce_indices)
+        return loss
+
 def generate_question(net, net_map, word_dict, rev_word_dict, cuda=False):
     """
     Sample question from model

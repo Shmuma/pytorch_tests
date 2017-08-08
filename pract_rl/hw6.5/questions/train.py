@@ -24,8 +24,8 @@ TRAIN_DATA_FILE = "~/work/data/experiments/quora-questions/train.csv"
 GLOVE_EMBEDDINGS = "~/work/data/experiments/glove.6B.50d.txt"
 HIDDEN_SIZE = 512
 EPOCHES = 500
-BATCH_TOKENS = 50000
-#BATCH_TOKENS = 16
+#BATCH_TOKENS = 50000
+BATCH_TOKENS = 16
 
 # H_SOFTMAX = True
 
@@ -74,7 +74,8 @@ if __name__ == "__main__":
 
     net = model.FixedEmbeddingsModel(embeddings, HIDDEN_SIZE)
 #    net_map = model.SoftmaxMappingModule(HIDDEN_SIZE, len(embeddings))
-    net_map = model.TwoLevelSoftmaxMappingModule(HIDDEN_SIZE, len(embeddings), freq_ratio=0.005, class_size_mul=2.0)
+#    net_map = model.TwoLevelSoftmaxMappingModule(HIDDEN_SIZE, len(embeddings), freq_ratio=0.005, class_size_mul=2.0)
+    net_map = model.SampledSoftmaxMappingModule(HIDDEN_SIZE, len(embeddings))
     if args.cuda:
         net.cuda()
         net_map.cuda()
@@ -111,12 +112,12 @@ if __name__ == "__main__":
         epoch_losses.append(loss)
 
         log.info("Epoch %d: mean_loss=%.4f, speed=%.3f item/s", epoch, loss, speed)
-        while True:
-            question = model.generate_question(net, net_map, words, rev_words, args.cuda)
-            if question:
-                break
-        print("Question on epoch %d: %s" % (epoch, " ".join(question)))
-        sys.stdout.flush()
+        # while True:
+        #     question = model.generate_question(net, net_map, words, rev_words, args.cuda)
+        #     if question:
+        #         break
+        # print("Question on epoch %d: %s" % (epoch, " ".join(question)))
+        # sys.stdout.flush()
         plots.plot_progress(epoch_losses, os.path.join(save_path, "status.html"))
 
         if best_loss is None or best_loss > loss:
