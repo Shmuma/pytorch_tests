@@ -308,7 +308,7 @@ class SampledSoftmaxMappingModule(MappingModule):
         return res
 
 
-def generate_question(net, net_map, word_dict, rev_word_dict, cuda=False, empty_ok=False, max_attempts=100):
+def generate_question(net, net_map, word_dict, rev_word_dict, cuda=False):
     """
     Sample question from model
     :param net: model to used
@@ -322,22 +322,19 @@ def generate_question(net, net_map, word_dict, rev_word_dict, cuda=False, empty_
     assert isinstance(word_dict, dict)
     assert isinstance(rev_word_dict, dict)
 
-    for _ in range(max_attempts):
-        result = []
-        hidden = None
-        token = np.random.choice(word_dict.keys())
-        while len(result) < 200:
-            token_v = Variable(torch.LongTensor([[word_dict[token]]]))
-            if cuda:
-                token_v = token_v.cuda()
-            out, hidden = net(token_v, hidden)
-            idx = net_map.infer(out[0])
-            idx = idx.data.cpu().numpy()[0][0]
-            token = rev_word_dict[idx]
-            if token == data.END_TOKEN:
-                break
-            result.append(token)
-        if result or empty_ok:
-            return result
+    token = rev_word_dict[np.random.choice(len(word_dict))]
+    result = [token]
+    hidden = None
+    while len(result) < 200:
+        token_v = Variable(torch.LongTensor([[word_dict[token]]]))
+        if cuda:
+            token_v = token_v.cuda()
+        out, hidden = net(token_v, hidden)
+        idx = net_map.infer(out[0])
+        idx = idx.data.cpu().numpy()[0][0]
+        token = rev_word_dict[idx]
+        if token == data.END_TOKEN:
+            break
+        result.append(token)
 
     return result

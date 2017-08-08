@@ -112,7 +112,7 @@ if __name__ == "__main__":
         epoch_losses.append(loss)
 
         log.info("Epoch %d: mean_loss=%.4f, speed=%.3f item/s", epoch, loss, speed)
-        question = model.generate_question(net, net_map, words, rev_words, args.cuda, empty_ok=False)
+        question = model.generate_question(net, net_map, words, rev_words, args.cuda)
         print("Question on epoch %d: %s" % (epoch, " ".join(question)))
         sys.stdout.flush()
         plots.plot_progress(epoch_losses, os.path.join(save_path, "status.html"))
