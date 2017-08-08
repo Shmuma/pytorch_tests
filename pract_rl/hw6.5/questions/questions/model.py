@@ -282,7 +282,7 @@ class SampledSoftmaxMappingModule(MappingModule):
         # create randomly-sampled indices to augment our valid data
         samples_indices = np.random.randint(low=0, high=self.dict_size,
                                             size=(valid_indices.size()[0], self.samples_count))
-        samples_indices_v = Variable(torch.from_numpy(samples_indices))
+        samples_indices_v = Variable(torch.from_numpy(samples_indices)).cuda()
         indices = torch.cat([torch.unsqueeze(valid_indices, dim=1), samples_indices_v], dim=1)
         emb_vals = self.out(indices)
         # here we have tensor (batch*samples+1*hidden)
@@ -294,7 +294,7 @@ class SampledSoftmaxMappingModule(MappingModule):
         scores = scores.sum(dim=2)
         scores = scores.squeeze(dim=2)
         probs = self.sm(scores)
-        ce_indices = Variable(torch.LongTensor([0]*valid_indices.size()[0]))
+        ce_indices = Variable(torch.LongTensor([0]*valid_indices.size()[0])).cuda()
         loss = self.ce(probs, ce_indices)
         return loss
 
