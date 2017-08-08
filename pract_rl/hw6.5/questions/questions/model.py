@@ -325,7 +325,7 @@ def generate_question(net, net_map, word_dict, rev_word_dict, cuda=False, empty_
     for _ in range(max_attempts):
         result = []
         hidden = None
-        token = data.END_TOKEN
+        token = np.random.choice(word_dict.keys())
         while len(result) < 200:
             token_v = Variable(torch.LongTensor([[word_dict[token]]]))
             if cuda:
