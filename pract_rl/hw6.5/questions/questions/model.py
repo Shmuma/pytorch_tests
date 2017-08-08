@@ -265,7 +265,7 @@ class SampledSoftmaxMappingModule(MappingModule):
     def __init__(self, input_size, dict_size, samples_count=5):
         """
         Construct sampled softmax mapping module
-        :param input_size: input dimension 
+        :param input_size: input dimension
         :param dict_size: count of words in vocabulary
         :param samples_count: count of extra random word samples
         """
@@ -282,7 +282,9 @@ class SampledSoftmaxMappingModule(MappingModule):
         # create randomly-sampled indices to augment our valid data
         samples_indices = np.random.randint(low=0, high=self.dict_size,
                                             size=(valid_indices.size()[0], self.samples_count))
-        samples_indices_v = Variable(torch.from_numpy(samples_indices)).cuda()
+        samples_indices_v = Variable(torch.from_numpy(samples_indices))
+        if x.is_cuda:
+            samples_indices_v = samples_indices_v.cuda()
         indices = torch.cat([torch.unsqueeze(valid_indices, dim=1), samples_indices_v], dim=1)
         emb_vals = self.out(indices)
         # here we have tensor (batch*samples+1*hidden)
@@ -294,9 +296,18 @@ class SampledSoftmaxMappingModule(MappingModule):
         scores = scores.sum(dim=2)
         scores = scores.squeeze(dim=2)
         probs = self.sm(scores)
-        ce_indices = Variable(torch.LongTensor([0]*valid_indices.size()[0])).cuda()
-        loss = self.ce(probs, ce_indices)
+        ce_indices_v = Variable(torch.LongTensor([0]*valid_indices.size()[0]))
+        if x.is_cuda:
+            ce_indices_v = ce_indices_v.cuda()
+        loss = self.ce(probs, ce_indices_v)
         return loss
+
+    def infer(self, x):
+        out = self.out.weight(x)
+        out = self.sm(out)
+        res = torch.multinomial(out, 1)
+        return res
+
 
 def generate_question(net, net_map, word_dict, rev_word_dict, cuda=False):
     """
