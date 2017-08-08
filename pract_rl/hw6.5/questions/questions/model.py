@@ -295,11 +295,10 @@ class SampledSoftmaxMappingModule(MappingModule):
         scores = torch.mul(emb_vals, xx)
         scores = scores.sum(dim=2)
         scores = scores.squeeze(dim=2)
-        probs = self.sm(scores)
         ce_indices_v = Variable(torch.LongTensor([0]*valid_indices.size()[0]))
         if x.is_cuda:
             ce_indices_v = ce_indices_v.cuda()
-        loss = self.ce(probs, ce_indices_v)
+        loss = self.ce(scores, ce_indices_v)
         return loss
 
     def infer(self, x):
