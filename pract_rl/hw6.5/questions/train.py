@@ -13,7 +13,6 @@ import numpy as np
 from questions import data, model, plots
 
 import torch
-import torch.nn as nn
 import torch.optim as optim
 
 
@@ -27,8 +26,6 @@ EPOCHES = 500
 BATCH_TOKENS = 30000
 #BATCH_TOKENS = 3000
 
-# H_SOFTMAX = True
-
 
 if __name__ == "__main__":
     random.seed(1234)
@@ -41,6 +38,9 @@ if __name__ == "__main__":
     parser.add_argument("--cuda", default=False, action='store_true', help="Enable cuda")
     parser.add_argument("--name", required=True, help="Name of directory to save models to")
     parser.add_argument("--tiny", default=False, action='store_true', help="Limit amount of samples to 5000")
+    parser.add_argument("--softmax", choices=['softmax', 'hsm', '2hsm', 'ssm'], default='softmax',
+                        help="Softmax to use. Valid values 'softmax' (no approximation), 'hsm' (full hierarchical softmax), "
+                             "'2hsm' (two-level hierarchical softmax), 'ssm' (sampled softmax)")
     args = parser.parse_args()
 
     save_path = os.path.join("saves", args.name)
@@ -73,9 +73,19 @@ if __name__ == "__main__":
     log.info("All preparations took %s", datetime.timedelta(seconds=time.time() - time_s))
 
     net = model.FixedEmbeddingsModel(embeddings, HIDDEN_SIZE)
-#    net_map = model.SoftmaxMappingModule(HIDDEN_SIZE, len(embeddings))
-#    net_map = model.TwoLevelSoftmaxMappingModule(HIDDEN_SIZE, len(embeddings), freq_ratio=0.005, class_size_mul=2.0)
-    net_map = model.SampledSoftmaxMappingModule(HIDDEN_SIZE, len(embeddings), samples_count=15)
+    infer_enabled = True
+
+    if args.softmax == 'hsm':
+        net_map = model.HierarchicalSoftmaxMappingModule()
+        log.warning("You've selected full HSM softmax, but it lacks infer method, no questions will be generated")
+        infer_enabled = False
+    elif args.softmax == '2hsm':
+        net_map = model.TwoLevelSoftmaxMappingModule(HIDDEN_SIZE, len(embeddings), freq_ratio=0.005, class_size_mul=2.0)
+    elif args.softmax == 'ssm':
+        net_map = model.SampledSoftmaxMappingModule(HIDDEN_SIZE, len(embeddings), samples_count=15)
+    else:
+        net_map = model.SoftmaxMappingModule(HIDDEN_SIZE, len(embeddings))
+
     if args.cuda:
         net.cuda()
         net_map.cuda()
@@ -112,10 +122,11 @@ if __name__ == "__main__":
         epoch_losses.append(loss)
 
         log.info("Epoch %d: mean_loss=%.4f, speed=%.3f item/s", epoch, loss, speed)
-        question = model.generate_question(net, net_map, words, rev_words, args.cuda)
-        print("Question on epoch %d: %s" % (epoch, " ".join(question)))
-        sys.stdout.flush()
         plots.plot_progress(epoch_losses, os.path.join(save_path, "status.html"))
+        if infer_enabled:
+            question = model.generate_question(net, net_map, words, rev_words, args.cuda)
+            print("Question on epoch %d: %s" % (epoch, " ".join(question)))
+            sys.stdout.flush()
 
         if best_loss is None or best_loss > loss:
             path = os.path.join(save_path, "%04d-model-loss=%.4f.data" % (epoch, loss))

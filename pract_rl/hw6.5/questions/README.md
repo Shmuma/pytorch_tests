@@ -3,11 +3,15 @@
 This code trains language model on [quora questions kaggle dataset](https://www.kaggle.com/c/quora-question-pairs) 
 using PyTorch. Pre-trained glove embeddings were used as initial values [glove 6B 50d embeddings](https://nlp.stanford.edu/projects/glove/). 
 
+The main goal was to implement and benchmark gpu-efficient softmax approximations.
+
 ## Model
 
-Single-layer, unidirectional LSTM with 512 hidden neurons shown the best results. To speed up learning, 
+Single-layer, unidirectional LSTM with 512 hidden neurons predicts next word in a train sequence. To speed up learning, 
 I've implemented two most popular softmax approximations: hierarchical softmax and sampled softmax on pytorch and 
 compared their speedups.  
+
+To run the code 
 
 ## Softmax approximation
 
