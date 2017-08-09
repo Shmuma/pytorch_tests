@@ -109,4 +109,4 @@ Speedup was calculated relative to full softmax with batch=1000. Memory usage me
 ## Conclusions
 
 Sampled softmax is very easy and straightforward to implement, but it's less efficient from GPU memory point of view,
-which leads to less speed up that two-level hierarchical softmax.  
+which leads to less speed up than two-level hierarchical softmax.  
