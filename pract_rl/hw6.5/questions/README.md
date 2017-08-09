@@ -87,7 +87,7 @@ Speedup was calculated relative to full softmax with batch=1000.
 Memory usage was also measured according to nvidia-smi tool output, but pytorch adjusts memory dynamically, so, it can be
 misleading.
 
-| Softmax | Batch size | Tokens/s | Epoch time | Speedup | GPU memory usage |
+| Method  | Batch size | Tokens/s | Epoch time | Speedup | GPU memory usage |
 |:-------:|-----------:|---------:|:----------:|--------:|-----------------:|
 | Softmax | 1k         | 1271     | 7:02       | 1.00    | 5.5GiB           |
 | Softmax | 3k         | 1568     | 5:42       | 1.23    | 9.6GiB           |
