@@ -73,7 +73,7 @@ with most frequent words to be placed in a root, and classes with less frequent 
 
 It's implemented in [questions/model.py, class TwoLevelSoftmaxMappingModule](https://github.com/Shmuma/pytorch_tests/blob/master/pract_rl/hw6.5/questions/questions/model.py#L142), 
 and it turned out to be the fastest of tried methods. With the same batch size (1000 tokens) it gave about 70% speed up, but
-due to it's memory effectiveness, I was able to increase batch size to 100000 tokens, which gave more than 14 times final speed increase.
+due to it's memory effectiveness, I was able to increase batch size to 100000 tokens (100 times!), which gave more than 14 times final speed increase.
 Actual numbers are in the section below. 
 
 ## Benchmarks
