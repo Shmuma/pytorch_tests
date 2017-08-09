@@ -1,4 +1,4 @@
-# Abstract
+# Softmax approximations experiment
 
 This code trains language model on [quora questions kaggle dataset](https://www.kaggle.com/c/quora-question-pairs) 
 using PyTorch. Pre-trained glove embeddings were used as initial values [glove 6B 50d embeddings](https://nlp.stanford.edu/projects/glove/). 
@@ -6,7 +6,7 @@ using PyTorch. Pre-trained glove embeddings were used as initial values [glove 6
 Input data contains 537k questions with total of 7.5m tokens. Glove embeddings dictionary was filtered with tokens 
 present in training data and final dictionary has 64517 words. 
 
-The main goal was to implement and benchmark gpu-efficient softmax approximations.
+The main goal was to implement and benchmark various gpu-efficient softmax approximations.
 
 ## Model
 
