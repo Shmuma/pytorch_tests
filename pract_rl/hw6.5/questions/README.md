@@ -1,7 +1,7 @@
 # Softmax approximations experiment
 
-This code trains language model on [quora questions kaggle dataset](https://www.kaggle.com/c/quora-question-pairs) 
-using PyTorch. Pre-trained glove embeddings were used as initial values [glove 6B 50d embeddings](https://nlp.stanford.edu/projects/glove/). 
+This code trains a language model on [quora questions kaggle dataset](https://www.kaggle.com/c/quora-question-pairs) 
+using PyTorch. The pre-trained glove embeddings were used as the initial values [glove 6B 50d embeddings](https://nlp.stanford.edu/projects/glove/). 
 
 Input data contains 537k questions with total of 7.5m tokens. Glove embeddings dictionary was filtered with tokens 
 present in training data and final dictionary has 64517 words. 
@@ -22,21 +22,21 @@ sorted by decrease of frequency (it's important for two-level softmax)
 
 ## Softmax approximation
 
-Common problem of neural language models is size of vocabulary we need to deal on the output of the network. 
-In general, our model should return probability distribution over whole vocabulary to select next predicted word on 
-every step of the sequence. Usually, it's achieved by output linear layer with softmax nonlinearity. Linear layer 
-(matrix of size H*N, where H is a size of RNN output and N is count of words) transforms hidder RNN state into word 
-'scores' and softmax normalizes it into probability distribution.
+The common problem of neural language models is the size of vocabulary we need to deal on the output of the network. 
+In general, our model should return probability distribution over the whole vocabulary to select the next predicted word on 
+every step of a sequence. Usually, it's achieved by final linear layer with the softmax nonlinearity. Linear layer 
+(matrix of size H*N, where H is a size of RNN output and N is count of words) transforms a hidden RNN state into word 
+'scores' and softmax normalizes it into the probability distribution.
 
 It works quite good, but even in moderate-size vocabulary of several hundred thousand words it requires giant matrices
 to be multiplied and normalized for every step of every training example.  
 
 ### Sampled Softmax
 
-Idea of sampled softmax is simple, the same as implementation. During training, we have valid word for every input 
-sequence entry. Instead of calculating probability over whole vocabulary, we randomly sample some fixed small amount of 
-words and using them as negative-samples, forcing our model to increase probability of correct words and decrease 
-probability of random examples. 
+The idea of the sampled softmax method is simple, the same as implementation. During training, we have a desired word 
+for every input sequence entry. Instead of calculating probability over the whole vocabulary, we randomly sample 
+some fixed small amount of words and use them as negative samples, forcing our model to increase probability of 
+correct words and decrease probability of random examples. 
 
 This approach implemented in [questions/model.py, class SampledSoftmaxMappingModule](https://github.com/Shmuma/pytorch_tests/blob/master/pract_rl/hw6.5/questions/questions/model.py#L262), 
 in those basic steps:
@@ -45,42 +45,44 @@ in those basic steps:
 3. perform scalar product of input matrix X (with RNN's output) to obtained matrix. This gives us unnormalized scores for every input sample,
 4. calculate cross-entropy loss for our scores.
 
-Very simple and straightforward. This method much simpler than Hierarchical Softmax I'm going to describe later. 
+Very simple and straightforward. This method is much simpler than Hierarchical Softmax I'm going to describe in a next section. 
 
-Benchmarks shown quite good speed up, ~5x times over naive softmax on vocabulary of 65k words.
+The benchmarks have shown quite good speed up, ~5x times over naive softmax on vocabulary of 65k words.
 
-Original paper on sampled softmax: [On using very large target vocabulary for Neural Machine Translation](https://arxiv.org/abs/1412.2007).
+The original paper on sampled softmax: ["On using very large target vocabulary for Neural Machine Translation"](https://arxiv.org/abs/1412.2007).
 
 ### Hierarchical Softmax
 
-Hierarchical softmax puts vocabulary in a tree, which allows to avoid calculations of probabilities for full vocabulary,
-replacing it several steps down the tree.
+The hierarchical softmax approach puts vocabulary in a tree, which allows us to avoid calculations 
+of probabilities for the full vocabulary, replacing it several distinct calculations to determine the path down the tree
+to reach every word.
 
 "Classical" approach is to put vocabulary in balanced binary tree, in which words will be placed in final leafs. 
-It reduces our computations from O(n) to O(log n), but, unfortunately have several drawbacks:
+It reduces our computations from O(n) to O(log n), but, unfortunately, this method has several drawbacks:
 
-1. final performance is heavily dependent on initial vocabulary splitting,
-2. it's not very efficient on modern GPUs.
+1. the initial tree structure influences final model significantly, 
+2. it's very inefficient on modern GPUs.
 
 I've implemented full hierarchical softmax in [questions/model.py, class HierarchicalSoftmaxMappingModule](https://github.com/Shmuma/pytorch_tests/blob/master/pract_rl/hw6.5/questions/questions/model.py#L83),
-but it worked slowly than original full softmax, so, it was excluded from consequent benchmarks.
+but it worked slower than original full softmax, so, it was excluded from consequent benchmarks.
 
-### Two level-hierarchical softmax   
+### Two level-hierarchical softmax
 
-Better approach proposed in paper from Facebook team [Efficient softmax approximation for GPUs](https://arxiv.org/abs/1609.04309).
-They propose to split vocabulary in small (4-10) amount of classes and organize them in two-level tree structure
-with most frequent words to be placed in a root, and classes with less frequent words will be put on second-level.
+Better approach proposed in the paper from the Facebook team ["Efficient softmax approximation for GPUs"](https://arxiv.org/abs/1609.04309).
+They propose to split the vocabulary in small (4-10) number of classes and organize them in two-level tree structure
+with the most frequent words to be placed in a root level and classes with less frequent words will be put on second level of the tree.
+Thus, for the most frequent words, to determine their probability we'll need only one matrix multiplication, for less frequent
+words, we'll need up to two multiplications.
 
-It's implemented in [questions/model.py, class TwoLevelSoftmaxMappingModule](https://github.com/Shmuma/pytorch_tests/blob/master/pract_rl/hw6.5/questions/questions/model.py#L142), 
-and it turned out to be the fastest of tried methods. With the same batch size (1000 tokens) it gave about 70% speed up, but
-due to it's memory effectiveness, I was able to increase batch size to 100000 tokens (100 times!), which gave more than 14 times final speed increase.
+This method is implemented in [questions/model.py, class TwoLevelSoftmaxMappingModule](https://github.com/Shmuma/pytorch_tests/blob/master/pract_rl/hw6.5/questions/questions/model.py#L142), 
+and it turned out to be the fastest method. With the same batch size (1000 tokens) it gave about 70% speed up, but
+due to it's GPU memory efficiency, I was able to increase batch size to 100000 tokens (100 times!), which gave more than 14 times final speed increase.
 Actual numbers are in the section below. 
 
 ## Benchmarks
 
-I've benchmarked all implementation on GTX 1080Ti with 11GiB of memory and pytorch 0.1.2. I've measured how many tokens 
-per second was processed during traning as well as wall clock epoch time. I've varied batch size which is measured in 
-tokens of input sequences passed to network at once.
+I've benchmarked all implementations on GTX 1080Ti with 11GiB of memory and PyTorch 0.1.2. I've measured how many tokens 
+per second was processed during training as well as wall clock epoch time. Batch size was adapted to utilize full GPU memory.
 
 Speedup was calculated relative to full softmax with batch=1000. Memory usage measured from nvidia-smi tool output.
 
