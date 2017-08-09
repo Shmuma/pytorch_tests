@@ -3,6 +3,9 @@
 This code trains language model on [quora questions kaggle dataset](https://www.kaggle.com/c/quora-question-pairs) 
 using PyTorch. Pre-trained glove embeddings were used as initial values [glove 6B 50d embeddings](https://nlp.stanford.edu/projects/glove/). 
 
+Input data contains 537k questions with total of 7.5m tokens. Glove embeddings dictionary was filtered with tokens 
+present in training data and final dictionary has 64517 words. 
+
 The main goal was to implement and benchmark gpu-efficient softmax approximations.
 
 ## Model
@@ -60,7 +63,7 @@ It reduces our computations from O(n) to O(log n), but, unfortunately have sever
 2. it's not very efficient on modern GPUs.
 
 I've implemented full hierarchical softmax in [questions/model.py, class HierarchicalSoftmaxMappingModule](https://github.com/Shmuma/pytorch_tests/blob/master/pract_rl/hw6.5/questions/questions/model.py#L83),
-but resulting speedup is mostly zero.
+but it worked slowly than original full softmax, so, it was excluded from consequent benchmarks.
 
 ### Two level-hierarchical softmax   
 
@@ -75,6 +78,38 @@ Actual numbers are in the section below.
 
 ## Benchmarks
 
-I've benchmarked all implementation on GTX 1080Ti and pytorch 0.1.2. I've measured how many tokens per second was processed 
-during traning as well as wall clock epoch time. I've varied batch size which is measured in tokens of input sequences
-passed to network at wonce.
+I've benchmarked all implementation on GTX 1080Ti with 11GiB of memory and pytorch 0.1.2. I've measured how many tokens 
+per second was processed during traning as well as wall clock epoch time. I've varied batch size which is measured in 
+tokens of input sequences passed to network at once.
+
+Speedup was calculated relative to full softmax with batch=1000.
+ 
+Memory usage was also measured according to nvidia-smi tool output, but pytorch adjusts memory dynamically, so, it can be
+misleading.
+
+| Softmax | Batch size | Tokens/s | Epoch time | Speedup | GPU memory usage |
+|:-------:|-----------:|---------:|:----------:|--------:|-----------------:|
+| Softmax | 1k         | 1271     | 7:02       | 1.00    | 5.5GiB           |
+| Softmax | 3k         | 1568     | 5:42       | 1.23    | 9.6GiB           |
+| Softmax | 5k         | 1668     | 5:21       | 1.31    | 10.5GiB          |
+|---------|------------|----------|------------|---------|------------------|
+| 2-HSM   | 1k         | 2186     | 4:05       | 1.72    | 1.2GiB           |  
+| 2-HSM   | 3k         | 5600     | 1:35       | 4.41    | 1.4GiB           |  
+| 2-HSM   | 5k         | 7686     | 1:09       | 6.05    | 1.8GiB           |  
+| 2-HSM   | 10k        | 11398    | 0:47       | 8.97    | 2.6GiB           |  
+| 2-HSM   | 20k        | 14745    | 0:36       | 11.60   | 3.5GiB           |  
+| 2-HSM   | 30k        | 16284    | 0:32       | 12.81   | 5.0GiB           |  
+| 2-HSM   | 50k        | 17626    | 0:30       | 13.87   | 7.6GiB           |  
+| 2-HSM   | 100k       | 18700    | 0:28       | 14.71   | 10.8GiB          |  
+|---------|------------|----------|------------|---------|------------------|
+| SSM     | 1k         | 2682     | 3:20       | 2.11    | 1.5GiB           |
+| SSM     | 3k         | 4662     | 1:55       | 3.67    | 2.5GiB           |
+| SSM     | 5k         | 5541     | 1:36       | 4.36    | 6.5GiB           |
+| SSM     | 10k        | 6590     | 1:21       | 5.18    | 8.4GiB           |
+| SSM     | 20k        | 7131     | 1:15       | 5.61    | 7.9GiB           |
+| SSM     | 30k        | 7318    |  1:13      |  5.76    | 10.5GiB          |
+
+## Conclusions
+
+Sampled softmax is very easy and straightforward to implement, but it's less efficient from GPU memory point of view,
+which leads to less speed up that two-level hierarchical softmax.  

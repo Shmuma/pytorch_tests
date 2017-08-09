@@ -88,12 +88,12 @@ class HierarchicalSoftmaxMappingModule(nn.Module):
     def __init__(self):
         super(HierarchicalSoftmaxMappingModule, self).__init__()
 
-    def forward(self, scores, class_indices, cuda=False):
+    def forward(self, scores, class_indices):
         batch_size, dict_size = scores.size()
         # without initial sigmoid, our predefined values should be large and small vals
         pad_one = Variable(torch.ones(batch_size, 1) * 100.0)
         pad_zer = Variable(torch.ones(batch_size, 1) * (-100.0))
-        if cuda:
+        if scores.is_cuda:
             pad_one = pad_one.cuda()
             pad_zer = pad_zer.cuda()
         padded_scores = torch.cat([pad_one, pad_zer, scores], dim=1)
@@ -108,7 +108,7 @@ class HierarchicalSoftmaxMappingModule(nn.Module):
         while mask > 0:
             left_list = []
             right_list = []
-            for batch_idx, right_branch in enumerate(map(lambda v: bool(v & mask), class_indices)):
+            for batch_idx, right_branch in enumerate(map(lambda v: bool(v & mask), class_indices.data)):
                 cur_index = indices[batch_idx]
                 if not right_branch:
                     left_list.append(cur_index)
@@ -127,7 +127,7 @@ class HierarchicalSoftmaxMappingModule(nn.Module):
 
         left_t = Variable(torch.LongTensor(left_indices)).t()
         right_t = Variable(torch.LongTensor(right_indices)).t()
-        if cuda:
+        if scores.is_cuda:
             left_t = left_t.cuda()
             right_t = right_t.cuda()
 

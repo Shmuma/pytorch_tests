@@ -41,6 +41,7 @@ if __name__ == "__main__":
     parser.add_argument("--softmax", choices=['softmax', 'hsm', '2hsm', 'ssm'], default='softmax',
                         help="Softmax to use. Valid values 'softmax' (no approximation), 'hsm' (full hierarchical softmax), "
                              "'2hsm' (two-level hierarchical softmax), 'ssm' (sampled softmax)")
+    parser.add_argument("--batch", type=int, default=BATCH_TOKENS, help="Count of tokens per batch, default=%d" % BATCH_TOKENS)
     args = parser.parse_args()
 
     save_path = os.path.join("saves", args.name)
@@ -106,8 +107,8 @@ if __name__ == "__main__":
         time_s = time.time()
         losses = []
 
-        for batch in tqdm(data.iterate_batches(train_sequences, BATCH_TOKENS),
-                          total=total_tokens // BATCH_TOKENS):
+        for batch in tqdm(data.iterate_batches(train_sequences, args.batch),
+                          total=total_tokens // args.batch):
             net.zero_grad()
             net_map.zero_grad()
             input_seq, valid_v = data.batch_to_train(batch, words, args.cuda)
