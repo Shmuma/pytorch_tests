@@ -82,10 +82,7 @@ I've benchmarked all implementation on GTX 1080Ti with 11GiB of memory and pytor
 per second was processed during traning as well as wall clock epoch time. I've varied batch size which is measured in 
 tokens of input sequences passed to network at once.
 
-Speedup was calculated relative to full softmax with batch=1000.
- 
-Memory usage was also measured according to nvidia-smi tool output, but pytorch adjusts memory dynamically, so, it can be
-misleading.
+Speedup was calculated relative to full softmax with batch=1000. Memory usage measured from nvidia-smi tool output.
 
 | Method  | Batch size | Tokens/s | Epoch time | Speedup | GPU memory usage |
 |:-------:|-----------:|---------:|:----------:|--------:|-----------------:|
