@@ -11,7 +11,11 @@ Single-layer, unidirectional LSTM with 512 hidden neurons predicts next word in 
 I've implemented two most popular softmax approximations: hierarchical softmax and sampled softmax on pytorch and 
 compared their speedups.  
 
-To run the code 
+To run the code, you need the following:
+1. glove embeddings (or other embeddings you like in text format similar to glove). Words in embeddings need to be 
+sorted by decrease of frequency (it's important for two-level softmax)
+2. quora kaggle dataset with questions
+3. gpu to use, as with cpu it will take ages to train.
 
 ## Softmax approximation
 
@@ -46,47 +50,31 @@ Original paper on sampled softmax: [On using very large target vocabulary for Ne
 
 ### Hierarchical Softmax
 
-I've implemented two-layer softmax approach following recent publication from Facebook research 
-[Efficient softmax approximation for GPUs](https://arxiv.org/abs/1609.04309), which gave ~3 times speed 
-up over standard softmax version. But due to more efficient GPU memory utilisation, it was possible to increase
-batch size more than 30 times, which gave additional 4 times speed up. 
+Hierarchical softmax puts vocabulary in a tree, which allows to avoid calculations of probabilities for full vocabulary,
+replacing it several steps down the tree.
 
-So, overall speed up on GTX 1080Ti is **11 times** (30 seconds per epoch versus 2:50).
+"Classical" approach is to put vocabulary in balanced binary tree, in which words will be placed in final leafs. 
+It reduces our computations from O(n) to O(log n), but, unfortunately have several drawbacks:
 
-## Two-layer softmax
+1. final performance is heavily dependent on initial vocabulary splitting,
+2. it's not very efficient on modern GPUs.
 
-Common problem of language models is the fact that on output, model needs to produce probability distribution over
-vorcabulary. As vocabulary is usually large (100k of words, sometimes even millions), the output operation dominates
-over the rest of computations.
+I've implemented full hierarchical softmax in [questions/model.py, class HierarchicalSoftmaxMappingModule](https://github.com/Shmuma/pytorch_tests/blob/master/pract_rl/hw6.5/questions/questions/model.py#L83),
+but resulting speedup is mostly zero.
 
-There are several tricks invented how to handle this, such as Sampled Softmax or Hierarchical Softmax.
+### Two level-hierarchical softmax   
 
-This code implements Two-Level hierarchical softmax, which, basically, splits the vocabulary into separate classes and
-organizes those classes into two-level tree, factorising probability distribution over all words in vocabulary into
-probability of predicted word to be in class times probability distribution of words withing predicted class.
+Better approach proposed in paper from Facebook team [Efficient softmax approximation for GPUs](https://arxiv.org/abs/1609.04309).
+They propose to split vocabulary in small (4-10) amount of classes and organize them in two-level tree structure
+with most frequent words to be placed in a root, and classes with less frequent words will be put on second-level.
 
-In paper "Efficient softmax approximation for GPUs", authors proposes to leave most frequent words on top level and 
-move less-frequent part of the dictionary into underlying classes.
+It's implemented in [questions/model.py, class TwoLevelSoftmaxMappingModule](https://github.com/Shmuma/pytorch_tests/blob/master/pract_rl/hw6.5/questions/questions/model.py#L142), 
+and it turned out to be the fastest of tried methods. With the same batch size (3000 tokens) it gave about 3 times speed up, but
+due to it's memory effectiveness, I was able to increase batch size to 100000 tokens, which gave more than 11 times speed up.
+Actual numbers are in the section below. 
 
-### Implementation details
+## Benchmarks
 
-PyTorch supports dynamic calculations, which is beneficial in such cases. Two-level softmax is implemented in 
-[questions/model.py, class TwoLevelSoftmaxMappingModule](https://github.com/Shmuma/pytorch_tests/blob/master/pract_rl/hw6.5/questions/questions/model.py#L142)
-
-During training, our forward() function supposed to calculate loss from hidden's layer output and valid word indices.
-As our batch is randomly sampled, indices can belong to different layers of our tree. Most of them will fall 
-into L1 (top level), which allows us to calculate output probability by single matrix multiplication, but some 
-(less frequent) will involve two multiplications, first to get probability for class and second to calculate
-probability for words withing class.
-
-To speed up this calculation, first, I sort our batch according to output indices, which makes our class ranges 
-continuous, and then, do required matrix multiplications.
-
-## Full hierarchical softmax implementation
-
-There is other version of HSM, implemented according to "classical" hierarchical softmax definition, which 
-assumes that we fully split our vocabulary into balanced binary tree 
-[questions/model.py, class HierarchicalSoftmaxMappingModule](https://github.com/Shmuma/pytorch_tests/blob/master/pract_rl/hw6.5/questions/questions/model.py#L83)
-
-But experiments gave zero speed up over normal softmax, and there is no practical usefulness of this code.  
- 
+I've benchmarked all implementation on GTX 1080Ti and pytorch 0.1.2. I've measured how many tokens per second was processed 
+during traning as well as wall clock epoch time. I've varied batch size which is measured in tokens of input sequences
+passed to network at wonce.
