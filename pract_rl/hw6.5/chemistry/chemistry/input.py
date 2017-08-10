@@ -43,7 +43,7 @@ class Vocabulary:
         return len(self.tokens)
 
 
-def encode_batch(input_batch, vocab):
+def encode_batch(input_batch, vocab, cuda=False):
     """
     Encode input batch
     :param input_batch: list of tuples with input and output sequences
@@ -64,6 +64,8 @@ def encode_batch(input_batch, vocab):
 
     # pack sequence
     padded_v = Variable(torch.from_numpy(padded))
+    if cuda:
+        padded_v = padded_v.cuda()
     input_packed = rnn_utils.pack_padded_sequence(padded_v, lens, batch_first=True)
     return input_packed, output_data
 

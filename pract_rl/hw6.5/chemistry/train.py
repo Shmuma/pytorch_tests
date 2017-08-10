@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import argparse
 import itertools
 import logging
 import random
@@ -19,7 +20,7 @@ SEED = 2345  # obtained from fair dice roll, do not change!
 HIDDEN_SIZE = 128
 
 EPOCHES = 100
-BATCH_SIZE = 100
+BATCH_SIZE = 1000
 
 
 log = logging.getLogger("train")
@@ -28,6 +29,9 @@ log = logging.getLogger("train")
 if __name__ == "__main__":
     random.seed(SEED)
     logging.basicConfig(format="%(asctime)-15s %(levelname)s %(name)-14s %(message)s", level=logging.INFO)
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--cuda", action='store_true', default=False, help="Enable cuda mode")
+    args = parser.parse_args()
 
     # read dataset
     data = input.read_data()
@@ -47,6 +51,9 @@ if __name__ == "__main__":
     # train
     encoder = model.Encoder(input_size=len(input_vocab), hidden_size=HIDDEN_SIZE)
     decoder = model.Decoder(hidden_size=HIDDEN_SIZE, output_size=len(output_vocab))
+    if args.cuda:
+        encoder.cuda()
+        decoder.cuda()
     optimizer = optim.Adam(itertools.chain(encoder.parameters(), decoder.parameters()), lr=0.01)
 
     end_token_idx = output_vocab.token_index[input.END_TOKEN]
@@ -55,7 +62,7 @@ if __name__ == "__main__":
         losses = []
         for batch in tqdm(input.iterate_batches(train_data, BATCH_SIZE), total=len(train_data) // BATCH_SIZE):
             optimizer.zero_grad()
-            input_packed, output_sequences = input.encode_batch(batch, input_vocab)
+            input_packed, output_sequences = input.encode_batch(batch, input_vocab, cuda=args.cuda)
 
             hid = encoder(input_packed)
 
@@ -74,6 +81,8 @@ if __name__ == "__main__":
                 input_emb = np.zeros(shape=(BATCH_SIZE, len(output_vocab)), dtype=np.float32)
                 input_emb[:, input_token_indices] = 1.0
                 input_emb_v = Variable(torch.from_numpy(input_emb))
+                if args.cuda:
+                    input_emb_v = input_emb_v.cuda()
 
                 # on first iteration pass hidden from encoder
                 dec_out, hid = decoder(input_emb_v, hid)
@@ -81,7 +90,10 @@ if __name__ == "__main__":
                 indices = torch.multinomial(nn_func.softmax(dec_out), num_samples=1)
                 input_token_indices = indices.cpu().data.numpy()[:, 0]
                 # calculate loss using our valid tokens and predicted stuff
-                loss = nn_func.cross_entropy(dec_out, Variable(torch.from_numpy(valid_token_indices[:, ofs])))
+                valid_idx_v = Variable(torch.from_numpy(valid_token_indices[:, ofs]))
+                if args.cuda:
+                    valid_idx_v = valid_idx_v.cuda()
+                loss = nn_func.cross_entropy(dec_out, valid_idx_v)
                 loss.backward(retain_variables=True)
                 batch_losses.append(loss.cpu().data.numpy())
             optimizer.step()
