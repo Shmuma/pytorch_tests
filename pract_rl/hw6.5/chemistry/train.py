@@ -56,7 +56,6 @@ if __name__ == "__main__":
     train_data, test_data = input.split_train_test(data, ratio=0.9)
     if args.tiny:
         train_data = train_data[:5000]
-        BATCH_SIZE = 100
     train_data.sort(key=len)
     log.info("Train has %d items, test %d", len(train_data), len(test_data))
 
