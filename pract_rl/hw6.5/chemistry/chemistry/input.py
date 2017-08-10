@@ -1,3 +1,4 @@
+import random
 import pandas as pd
 import numpy as np
 
@@ -65,3 +66,11 @@ def encode_batch(input_batch, vocab):
     padded_v = Variable(torch.from_numpy(padded))
     input_packed = rnn_utils.pack_padded_sequence(padded_v, lens, batch_first=True)
     return input_packed, output_data
+
+
+def iterate_batches(data, batch_size):
+    random.shuffle(data)
+    ofs = 0
+    while ofs < len(data):
+        yield data[ofs:ofs+batch_size]
+        ofs += batch_size

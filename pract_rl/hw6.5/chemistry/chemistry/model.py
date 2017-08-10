@@ -10,7 +10,8 @@ class Encoder(nn.Module):
         self.rnn = nn.RNN(input_size, hidden_size, batch_first=True)
 
     def forward(self, x, h=None):
-        return self.rnn(x, h)
+        _, hidden = self.rnn(x, h)
+        return hidden
 
 
 class Decoder(nn.Module):

@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
+import itertools
 import logging
 import random
 import numpy as np
+from tqdm import tqdm
 
 from chemistry import input
 from chemistry import model
@@ -15,6 +17,9 @@ from torch.autograd import Variable
 
 SEED = 2345  # obtained from fair dice roll, do not change!
 HIDDEN_SIZE = 128
+
+EPOCHES = 100
+BATCH_SIZE = 100
 
 
 log = logging.getLogger("train")
@@ -42,25 +47,44 @@ if __name__ == "__main__":
     # train
     encoder = model.Encoder(input_size=len(input_vocab), hidden_size=HIDDEN_SIZE)
     decoder = model.Decoder(hidden_size=HIDDEN_SIZE, output_size=len(output_vocab))
+    optimizer = optim.Adam(itertools.chain(encoder.parameters(), decoder.parameters()), lr=0.01)
 
-    input_packed, output_seq = input.encode_batch(train_data[:1], input_vocab)
-    out, hid = encoder(input_packed)
-    next_token = input.END_TOKEN
+    end_token_idx = output_vocab.token_index[input.END_TOKEN]
 
-    print(hid.size())
-    generated = []
+    for epoch in range(EPOCHES):
+        losses = []
+        for batch in tqdm(input.iterate_batches(train_data, BATCH_SIZE), total=len(train_data) // BATCH_SIZE):
+            optimizer.zero_grad()
+            input_packed, output_sequences = input.encode_batch(batch, input_vocab)
 
-    for valid_token in list(output_seq[0]) + [input.END_TOKEN]:
-        # input to the decoder
-        token_emb = np.zeros(shape=(1, len(output_vocab)), dtype=np.float32)
-        token_emb[0][output_vocab.token_index[next_token]] = 1.0
-        token_emb_v = Variable(torch.from_numpy(token_emb))
-        dec_out, dec_hid = decoder(token_emb_v, hid)
-        # find next tokens for batch
-        indices = torch.multinomial(nn_func.softmax(dec_out), num_samples=1)
-        next_token = output_vocab.index_token[indices.cpu().data.numpy()[0][0]]
-        generated.append(next_token)
-        loss = nn_func.cross_entropy(dec_out, Variable(torch.LongTensor([output_vocab.token_index[valid_token]])))
-        print(dec_hid.size())
-        break
+            hid = encoder(input_packed)
+
+            # input for decoder
+            input_token_indices = np.array([end_token_idx]*BATCH_SIZE)
+            max_out_len = max(map(len, output_sequences))
+            # expected tokens
+            valid_token_indices = np.full(shape=(BATCH_SIZE, max_out_len), fill_value=end_token_idx, dtype=np.int64)
+            for idx, out_seq in enumerate(output_sequences):
+                valid_token_indices[idx][:len(out_seq)] = [output_vocab.token_index[c] for c in out_seq]
+
+            batch_losses = []
+
+            # iterate decoder over largest sequence
+            for ofs in range(max_out_len):
+                input_emb = np.zeros(shape=(BATCH_SIZE, len(output_vocab)), dtype=np.float32)
+                input_emb[:, input_token_indices] = 1.0
+                input_emb_v = Variable(torch.from_numpy(input_emb))
+
+                # on first iteration pass hidden from encoder
+                dec_out, hid = decoder(input_emb_v, hid)
+                # sample next tokens for decoder's input
+                indices = torch.multinomial(nn_func.softmax(dec_out), num_samples=1)
+                input_token_indices = indices.cpu().data.numpy()[:, 0]
+                # calculate loss using our valid tokens and predicted stuff
+                loss = nn_func.cross_entropy(dec_out, Variable(torch.from_numpy(valid_token_indices[:, ofs])))
+                loss.backward(retain_variables=True)
+                batch_losses.append(loss.cpu().data.numpy())
+            optimizer.step()
+            losses.append(np.mean(batch_losses))
+        log.info("Epoch %d: mean_loss=%.4f", np.mean(losses))
     pass
