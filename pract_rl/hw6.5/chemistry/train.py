@@ -1,9 +1,16 @@
 #!/usr/bin/env python3
 import logging
 import random
+import numpy as np
 
 from chemistry import input
 from chemistry import model
+
+import torch
+import torch.nn as nn
+import torch.nn.functional as nn_func
+import torch.optim as optim
+from torch.autograd import Variable
 
 
 SEED = 2345  # obtained from fair dice roll, do not change!
@@ -38,5 +45,22 @@ if __name__ == "__main__":
 
     input_packed, output_seq = input.encode_batch(train_data[:1], input_vocab)
     out, hid = encoder(input_packed)
+    next_token = input.END_TOKEN
+
     print(hid.size())
+    generated = []
+
+    for valid_token in list(output_seq[0]) + [input.END_TOKEN]:
+        # input to the decoder
+        token_emb = np.zeros(shape=(1, len(output_vocab)), dtype=np.float32)
+        token_emb[0][output_vocab.token_index[next_token]] = 1.0
+        token_emb_v = Variable(torch.from_numpy(token_emb))
+        dec_out, dec_hid = decoder(token_emb_v, hid)
+        # find next tokens for batch
+        indices = torch.multinomial(nn_func.softmax(dec_out), num_samples=1)
+        next_token = output_vocab.index_token[indices.cpu().data.numpy()[0][0]]
+        generated.append(next_token)
+        loss = nn_func.cross_entropy(dec_out, Variable(torch.LongTensor([output_vocab.token_index[valid_token]])))
+        print(dec_hid.size())
+        break
     pass

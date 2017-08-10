@@ -19,12 +19,12 @@ class Decoder(nn.Module):
 
         self.rnn = nn.RNN(output_size, hidden_size, batch_first=True)
         self.out = nn.Linear(hidden_size, output_size)
-        self.sm = nn.Softmax()
 
     def forward(self, x, h):
-        y, h = self.rnn(x, h)
-        out = self.out(y)
-        out = self.sm(out)
+        # input has to be batch*embedding, i.e. contain only one time stamp
+        y, h = self.rnn(x.unsqueeze(dim=1), h)
+        ys = y.squeeze(dim=1)
+        out = self.out(ys)
         return out, h
 
 pass
