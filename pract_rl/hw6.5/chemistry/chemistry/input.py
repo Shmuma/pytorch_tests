@@ -71,7 +71,6 @@ def encode_batch(input_batch, vocab, cuda=False):
 
 
 def iterate_batches(data, batch_size):
-    random.shuffle(data)
     ofs = 0
     while ofs < len(data):
         yield data[ofs:ofs+batch_size]

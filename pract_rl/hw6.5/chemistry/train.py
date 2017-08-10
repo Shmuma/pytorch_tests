@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import os
 import argparse
 import itertools
 import logging
@@ -8,9 +9,9 @@ from tqdm import tqdm
 
 from chemistry import input
 from chemistry import model
+from chemistry import plots
 
 import torch
-import torch.nn as nn
 import torch.nn.functional as nn_func
 import torch.optim as optim
 from torch.autograd import Variable
@@ -31,7 +32,14 @@ if __name__ == "__main__":
     logging.basicConfig(format="%(asctime)-15s %(levelname)s %(name)-14s %(message)s", level=logging.INFO)
     parser = argparse.ArgumentParser()
     parser.add_argument("--cuda", action='store_true', default=False, help="Enable cuda mode")
+    parser.add_argument("--name", required=True, help="Name of directory to save models to")
+    parser.add_argument("--tiny", default=False, action='store_true', help="Limit amount of samples to 5000")
     args = parser.parse_args()
+
+    save_path = os.path.join("saves", args.name)
+    if args.tiny:
+        save_path += "-tiny"
+    os.makedirs(save_path, exist_ok=args.tiny)
 
     # read dataset
     data = input.read_data()
@@ -46,6 +54,10 @@ if __name__ == "__main__":
 
     # split into train/test
     train_data, test_data = input.split_train_test(data, ratio=0.9)
+    if args.tiny:
+        train_data = train_data[:5000]
+        BATCH_SIZE = 100
+    train_data.sort(key=len)
     log.info("Train has %d items, test %d", len(train_data), len(test_data))
 
     # train
@@ -60,17 +72,17 @@ if __name__ == "__main__":
 
     for epoch in range(EPOCHES):
         losses = []
-        for batch in tqdm(input.iterate_batches(train_data, BATCH_SIZE), total=len(train_data) // BATCH_SIZE):
+        for batch in tqdm(input.iterate_batches(train_data, BATCH_SIZE), total=len(train_data) / BATCH_SIZE):
             optimizer.zero_grad()
             input_packed, output_sequences = input.encode_batch(batch, input_vocab, cuda=args.cuda)
 
             hid = encoder(input_packed)
 
             # input for decoder
-            input_token_indices = np.array([end_token_idx]*BATCH_SIZE)
+            input_token_indices = np.array([end_token_idx]*len(batch))
             max_out_len = max(map(len, output_sequences))
             # expected tokens
-            valid_token_indices = np.full(shape=(BATCH_SIZE, max_out_len), fill_value=end_token_idx, dtype=np.int64)
+            valid_token_indices = np.full(shape=(len(batch), max_out_len), fill_value=end_token_idx, dtype=np.int64)
             for idx, out_seq in enumerate(output_sequences):
                 valid_token_indices[idx][:len(out_seq)] = [output_vocab.token_index[c] for c in out_seq]
 
@@ -78,7 +90,7 @@ if __name__ == "__main__":
 
             # iterate decoder over largest sequence
             for ofs in range(max_out_len):
-                input_emb = np.zeros(shape=(BATCH_SIZE, len(output_vocab)), dtype=np.float32)
+                input_emb = np.zeros(shape=(len(batch), len(output_vocab)), dtype=np.float32)
                 input_emb[:, input_token_indices] = 1.0
                 input_emb_v = Variable(torch.from_numpy(input_emb))
                 if args.cuda:
@@ -99,4 +111,5 @@ if __name__ == "__main__":
             optimizer.step()
             losses.append(np.mean(batch_losses))
         log.info("Epoch %d: mean_loss=%.4f", np.mean(losses))
+        plots.plot_progress(epoch_losses, os.path.join(save_path, "status.html"))
     pass
