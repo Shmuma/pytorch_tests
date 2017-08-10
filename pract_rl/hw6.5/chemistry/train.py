@@ -21,7 +21,7 @@ SEED = 2345  # obtained from fair dice roll, do not change!
 HIDDEN_SIZE = 128
 
 EPOCHES = 100
-BATCH_SIZE = 1000
+BATCH_SIZE = 200
 
 
 log = logging.getLogger("train")
@@ -56,7 +56,7 @@ if __name__ == "__main__":
     train_data, test_data = input.split_train_test(data, ratio=0.9)
     if args.tiny:
         train_data = train_data[:5000]
-    train_data.sort(key=len)
+    random.shuffle(train_data)
     log.info("Train has %d items, test %d", len(train_data), len(test_data))
 
     # train
