@@ -58,8 +58,7 @@ if __name__ == "__main__":
     train_data, test_data = input.split_train_test(data, ratio=0.9)
     if args.tiny:
         train_data = train_data[:5000]
-    #random.shuffle(train_data)
-    train_data.sort(key=len)
+    random.shuffle(train_data)
     log.info("Train has %d items, test %d", len(train_data), len(test_data))
 
     # train
@@ -90,33 +89,31 @@ if __name__ == "__main__":
 
             # input for decoder
             ts = time.time()
-            input_token_indices = np.array([end_token_idx]*len(batch))
-            max_out_len = max(map(len, output_sequences))
+            input_token_indices = torch.LongTensor([end_token_idx]*len(batch))
+            max_out_len = max(map(len, output_sequences)) + 1 # extra item for final END_TOKEN
             # expected tokens
             valid_token_indices = np.full(shape=(len(batch), max_out_len), fill_value=end_token_idx, dtype=np.int64)
             for idx, out_seq in enumerate(output_sequences):
                 valid_token_indices[idx][:len(out_seq)] = [output_vocab.token_index[c] for c in out_seq]
+            valid_token_indices_v = Variable(torch.from_numpy(valid_token_indices.transpose()))
+            if args.cuda:
+                valid_token_indices_v = valid_token_indices_v.cuda()
             time_counters['expected_tokens'] += time.time() - ts
 
             # iterate decoder over largest sequence
             ts = time.time()
             for ofs in range(max_out_len):
-                input_emb = np.zeros(shape=(len(batch), len(output_vocab)), dtype=np.float32)
+                input_emb = torch.zeros(len(batch), len(output_vocab))
                 input_emb[:, input_token_indices] = 1.0
-                input_emb_v = Variable(torch.from_numpy(input_emb))
+                input_emb_v = Variable(input_emb)
                 if args.cuda:
                     input_emb_v = input_emb_v.cuda()
 
                 # on first iteration pass hidden from encoder
                 dec_out, hid = decoder(input_emb_v, hid)
                 # sample next tokens for decoder's input
-                indices = torch.multinomial(nn_func.softmax(dec_out), num_samples=1)
-                input_token_indices = indices.cpu().data.numpy()[:, 0]
-                # calculate loss using our valid tokens and predicted stuff
-                valid_idx_v = Variable(torch.from_numpy(valid_token_indices[:, ofs]))
-                if args.cuda:
-                    valid_idx_v = valid_idx_v.cuda()
-                loss = nn_func.cross_entropy(dec_out, valid_idx_v)
+                input_token_indices = torch.multinomial(nn_func.softmax(dec_out), num_samples=1)
+                loss = nn_func.cross_entropy(dec_out, valid_token_indices_v[ofs])
                 loss.backward(retain_variables=True)
                 losses.append(loss.cpu().data.numpy())
             time_counters['decoder'] += time.time() - ts
