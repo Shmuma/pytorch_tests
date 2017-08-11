@@ -107,7 +107,7 @@ if __name__ == "__main__":
                 loss.backward(retain_variables=True)
                 losses.append(loss.cpu().data.numpy())
             optimizer.step()
-        log.info("Epoch %d: mean_loss=%.4f", np.mean(losses))
+        log.info("Epoch %d: mean_loss=%.4f", epoch, np.mean(losses))
         epoch_losses.append(np.mean(losses))
         plots.plot_progress(epoch_losses, os.path.join(save_path, "status.html"))
     pass
