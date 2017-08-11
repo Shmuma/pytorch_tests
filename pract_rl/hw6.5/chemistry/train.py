@@ -80,6 +80,8 @@ if __name__ == "__main__":
             input_packed, output_sequences = input.encode_batch(batch, input_vocab, cuda=args.cuda)
 
             hid = encoder(input_packed)
+#            print(len(hid), hid[0].size(), hid[1].size())
+#            print(hid.size())
 
             # input for decoder
             input_token_indices = torch.LongTensor([end_token_idx]).repeat(len(batch), 1)
