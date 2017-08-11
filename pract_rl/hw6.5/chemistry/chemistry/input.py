@@ -70,8 +70,22 @@ def encode_batch(input_batch, vocab, cuda=False):
     return input_packed, output_data
 
 
-def iterate_batches(data, batch_size):
-    ofs = 0
-    while ofs < len(data):
-        yield data[ofs:ofs+batch_size]
-        ofs += batch_size
+def iterate_batches(data, batch_tokens, mem_limit):
+    tokens = 0
+    batch_start = 0
+    batch_len = 0
+    max_len = 0
+    while batch_start + batch_len < len(data):
+        mem_footprint = tokens * max_len
+        if tokens >= batch_tokens or mem_footprint > mem_limit:
+            yield data[batch_start:batch_start+batch_len]
+            batch_start += batch_len
+            batch_len = 0
+            tokens = 0
+            max_len = 0
+        l = len(data[batch_start+batch_len][0])
+        max_len = max(max_len, l)
+        tokens += l
+        batch_len += 1
+    if tokens > 0:
+        yield data[batch_start:batch_start+batch_len]

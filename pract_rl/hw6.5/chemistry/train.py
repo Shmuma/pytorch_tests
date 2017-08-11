@@ -23,7 +23,10 @@ SEED = 2345  # obtained from fair dice roll, do not change!
 HIDDEN_SIZE = 128
 
 EPOCHES = 100
-BATCH_SIZE = 100
+# batch size is in tokens, not in sequences
+BATCH_SIZE = 10000
+# limit is in BATCH_TOKENS * max_sequence_len
+MEM_LIMIT = BATCH_SIZE * 10
 
 
 log = logging.getLogger("train")
@@ -58,7 +61,7 @@ if __name__ == "__main__":
     train_data, test_data = input.split_train_test(data, ratio=0.9)
     if args.tiny:
         train_data = train_data[:5000]
-    train_data.sort(key=len)
+    train_data.sort(key=lambda t: len(t[0]))
     log.info("Train has %d items, test %d", len(train_data), len(test_data))
 
     # train
@@ -71,17 +74,21 @@ if __name__ == "__main__":
 
     end_token_idx = output_vocab.token_index[input.END_TOKEN]
     epoch_losses = []
+    total_tokens = sum(map(lambda t: len(t[0]), train_data))
 
     for epoch in range(EPOCHES):
         losses = []
 
-        for batch in tqdm(input.iterate_batches(train_data, BATCH_SIZE), total=len(train_data) / BATCH_SIZE):
+        for batch in tqdm(input.iterate_batches(train_data, BATCH_SIZE, mem_limit=MEM_LIMIT), total=2*total_tokens / BATCH_SIZE):
+            # tokens = sum(map(lambda t: len(t[0]), batch))
+            # min_len = min(map(lambda t: len(t[0]), batch))
+            # max_len = max(map(lambda t: len(t[0]), batch))
+            # log.info("Batch_len=%d, tokens=%d, min=%d, max=%d, mem=%d",
+            #          len(batch), sum(map(lambda t: len(t[0]), batch)), min_len, max_len, tokens*max_len)
             optimizer.zero_grad()
             input_packed, output_sequences = input.encode_batch(batch, input_vocab, cuda=args.cuda)
 
             hid = encoder(input_packed)
-#            print(len(hid), hid[0].size(), hid[1].size())
-#            print(hid.size())
 
             # input for decoder
             input_token_indices = torch.LongTensor([end_token_idx]).repeat(len(batch), 1)
