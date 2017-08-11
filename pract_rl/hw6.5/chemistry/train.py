@@ -20,7 +20,7 @@ from torch.autograd import Variable
 
 
 SEED = 2345  # obtained from fair dice roll, do not change!
-HIDDEN_SIZE = 128
+HIDDEN_SIZE = 512
 
 EPOCHES = 100
 # batch size is in tokens, not in sequences
