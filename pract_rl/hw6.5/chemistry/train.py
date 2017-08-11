@@ -106,6 +106,8 @@ if __name__ == "__main__":
                 valid_token_indices_v = valid_token_indices_v.cuda()
 
             # iterate decoder over largest sequence
+            batch_loss = None
+
             ts = time.time()
             for ofs in range(max_out_len):
                 input_emb_v.data.zero_()
@@ -116,10 +118,14 @@ if __name__ == "__main__":
                 # sample next tokens for decoder's input
                 input_token_indices = torch.multinomial(nn_func.softmax(dec_out), num_samples=1).data
                 loss = nn_func.cross_entropy(dec_out, valid_token_indices_v[ofs])
-                loss.backward(retain_variables=True)
-                losses.append(loss.cpu().data.numpy())
+                if batch_loss is None:
+                    batch_loss = loss
+                else:
+                    batch_loss += loss
             time_counters['decoder'] += time.time() - ts
+            batch_loss.backward()
             optimizer.step()
+            losses.append(batch_loss.cpu().data.numpy() / max_out_len)
         ts_epoch = time.time() - ts_epoch
         log.info("Epoch %d: mean_loss=%.4f", epoch, np.mean(losses))
         epoch_losses.append(np.mean(losses))
