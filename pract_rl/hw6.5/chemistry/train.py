@@ -23,7 +23,7 @@ SEED = 2345  # obtained from fair dice roll, do not change!
 HIDDEN_SIZE = 128
 
 EPOCHES = 100
-BATCH_SIZE = 200
+BATCH_SIZE = 100
 
 
 log = logging.getLogger("train")
