@@ -68,6 +68,7 @@ if __name__ == "__main__":
     optimizer = optim.Adam(itertools.chain(encoder.parameters(), decoder.parameters()), lr=0.01)
 
     end_token_idx = output_vocab.token_index[input.END_TOKEN]
+    epoch_losses = []
 
     for epoch in range(EPOCHES):
         losses = []
@@ -84,8 +85,6 @@ if __name__ == "__main__":
             valid_token_indices = np.full(shape=(len(batch), max_out_len), fill_value=end_token_idx, dtype=np.int64)
             for idx, out_seq in enumerate(output_sequences):
                 valid_token_indices[idx][:len(out_seq)] = [output_vocab.token_index[c] for c in out_seq]
-
-            batch_losses = []
 
             # iterate decoder over largest sequence
             for ofs in range(max_out_len):
@@ -106,9 +105,9 @@ if __name__ == "__main__":
                     valid_idx_v = valid_idx_v.cuda()
                 loss = nn_func.cross_entropy(dec_out, valid_idx_v)
                 loss.backward(retain_variables=True)
-                batch_losses.append(loss.cpu().data.numpy())
+                losses.append(loss.cpu().data.numpy())
             optimizer.step()
-            losses.append(np.mean(batch_losses))
         log.info("Epoch %d: mean_loss=%.4f", np.mean(losses))
+        epoch_losses.append(np.mean(losses))
         plots.plot_progress(epoch_losses, os.path.join(save_path, "status.html"))
     pass
