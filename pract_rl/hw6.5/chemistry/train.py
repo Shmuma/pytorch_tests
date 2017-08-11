@@ -89,30 +89,32 @@ if __name__ == "__main__":
 
             # input for decoder
             ts = time.time()
-            input_token_indices = torch.LongTensor([end_token_idx]*len(batch))
+            input_token_indices = torch.LongTensor([[end_token_idx]] * len(batch))
             max_out_len = max(map(len, output_sequences)) + 1 # extra item for final END_TOKEN
             # expected tokens
             valid_token_indices = np.full(shape=(len(batch), max_out_len), fill_value=end_token_idx, dtype=np.int64)
             for idx, out_seq in enumerate(output_sequences):
                 valid_token_indices[idx][:len(out_seq)] = [output_vocab.token_index[c] for c in out_seq]
             valid_token_indices_v = Variable(torch.from_numpy(valid_token_indices.transpose()))
-            if args.cuda:
-                valid_token_indices_v = valid_token_indices_v.cuda()
             time_counters['expected_tokens'] += time.time() - ts
+
+            input_emb = torch.FloatTensor(len(batch), len(output_vocab))
+            input_emb_v = Variable(input_emb)
+            if args.cuda:
+                input_emb_v = input_emb_v.cuda()
+                input_token_indices = input_token_indices.cuda()
+                valid_token_indices_v = valid_token_indices_v.cuda()
 
             # iterate decoder over largest sequence
             ts = time.time()
             for ofs in range(max_out_len):
-                input_emb = torch.zeros(len(batch), len(output_vocab))
-                input_emb[:, input_token_indices] = 1.0
-                input_emb_v = Variable(input_emb)
-                if args.cuda:
-                    input_emb_v = input_emb_v.cuda()
+                input_emb_v.data.zero_()
+                input_emb_v.data.scatter_(1, input_token_indices, 1.0)
 
                 # on first iteration pass hidden from encoder
                 dec_out, hid = decoder(input_emb_v, hid)
                 # sample next tokens for decoder's input
-                input_token_indices = torch.multinomial(nn_func.softmax(dec_out), num_samples=1)
+                input_token_indices = torch.multinomial(nn_func.softmax(dec_out), num_samples=1).data
                 loss = nn_func.cross_entropy(dec_out, valid_token_indices_v[ofs])
                 loss.backward(retain_variables=True)
                 losses.append(loss.cpu().data.numpy())
