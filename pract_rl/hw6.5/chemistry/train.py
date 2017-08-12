@@ -24,9 +24,9 @@ HIDDEN_SIZE = 128
 
 EPOCHES = 100
 # batch size is in tokens, not in sequences
-BATCH_SIZE = 10000
+BATCH_SIZE = 5000
 # limit is in BATCH_TOKENS * max_sequence_len
-MEM_LIMIT = BATCH_SIZE * 20
+MEM_LIMIT = BATCH_SIZE * 10
 
 
 log = logging.getLogger("train")
@@ -85,7 +85,7 @@ if __name__ == "__main__":
     # read dataset
     data = input.read_data()
     random.shuffle(data)
-    log.info("Have %d samples", len(data[0]))
+    log.info("Have %d samples", len(data))
 
     input_vocab  = input.Vocabulary(map(lambda p: p[0], data))
     output_vocab = input.Vocabulary(map(lambda p: p[1], data), extra_items=(input.END_TOKEN, ))
