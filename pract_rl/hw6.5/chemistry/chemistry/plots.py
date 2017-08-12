@@ -17,5 +17,6 @@ def plot_progress(losses, ratios, ratios_train, file_name):
     f2.height = 500
     f2.line(range(len(losses)), ratios, legend="Ratio test", line_width=2, color='red')
     f2.line(range(len(losses)), ratios_train, legend="Ratio train", line_width=2, color='green')
+    f2.legend.location = 'top_left'
 
     save(row(f, f2))

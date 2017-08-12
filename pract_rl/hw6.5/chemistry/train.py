@@ -20,9 +20,9 @@ from torch.autograd import Variable
 
 
 SEED = 2345  # obtained from fair dice roll, do not change!
-HIDDEN_SIZE = 128
+HIDDEN_SIZE = 512
 
-EPOCHES = 100
+EPOCHES = 10000
 # batch size is in tokens, not in sequences
 BATCH_SIZE = 5000
 # limit is in BATCH_TOKENS * max_sequence_len
@@ -157,9 +157,10 @@ if __name__ == "__main__":
                     batch_loss = loss
                 else:
                     batch_loss += loss
+            batch_loss /= max_out_len
             batch_loss.backward()
             optimizer.step()
-            losses.append(batch_loss.cpu().data.numpy() / max_out_len)
+            losses.append(batch_loss.cpu().data.numpy())
         test_ratio = test_model(encoder, decoder, input_vocab, output_vocab, test_data, cuda=args.cuda)
         train_ratio = test_model(encoder, decoder, input_vocab, output_vocab, random.sample(train_data, 500), cuda=args.cuda)
         log.info("Epoch %d: mean_loss=%.4f, test_ratio=%.3f%%, train_ratio=%.3f%%", epoch, np.mean(losses),
