@@ -32,6 +32,42 @@ MEM_LIMIT = BATCH_SIZE * 20
 log = logging.getLogger("train")
 
 
+def test_model(net_encoder, net_decoder, input_vocab, output_vocab, test_data, cuda=False):
+    input_packed, output_sequences = input.encode_batch(test_data, input_vocab, cuda=cuda, volatile=True)
+    hid = net_encoder(input_packed)
+    end_token_idx = output_vocab.token_index[input.END_TOKEN]
+    input_token_indices = torch.LongTensor([end_token_idx]).repeat(len(test_data), 1)
+    max_out_len = max(map(len, output_sequences)) + 1  # extra item for final END_TOKEN
+    input_emb = torch.FloatTensor(len(test_data), len(output_vocab))
+
+    if cuda:
+        input_emb = input_emb.cuda()
+        input_token_indices = input_token_indices.cuda()
+
+    total_tokens = 0
+    valid_tokens = 0
+
+    for ofs in range(max_out_len):
+        input_emb.zero_()
+        input_emb.scatter_(1, input_token_indices, 1.0)
+        input_emb_v = Variable(input_emb, volatile=True)
+        if cuda:
+            input_emb_v = input_emb_v.cuda()
+
+        dec_out, hid = net_decoder(input_emb_v, hid)
+        input_token_indices = torch.multinomial(nn_func.softmax(dec_out), num_samples=1).data
+        for seq_idx, token in enumerate(input_token_indices):
+            cur_seq = output_sequences[seq_idx]
+            if ofs > len(cur_seq):
+                continue
+            total_tokens += 1
+            if ofs == len(cur_seq):
+                valid_tokens += int(token[0] == end_token_idx)
+            else:
+                valid_tokens += int(token[0] == output_vocab.token_index[cur_seq[ofs]])
+    return valid_tokens / total_tokens
+
+
 if __name__ == "__main__":
     random.seed(SEED)
     logging.basicConfig(format="%(asctime)-15s %(levelname)s %(name)-14s %(message)s", level=logging.INFO)
@@ -61,6 +97,7 @@ if __name__ == "__main__":
     train_data, test_data = input.split_train_test(data, ratio=0.9)
     if args.tiny:
         train_data = train_data[:5000]
+        test_data = test_data[:500]
     train_data.sort(key=lambda t: len(t[0]))
     log.info("Train has %d items, test %d", len(train_data), len(test_data))
 
@@ -74,17 +111,14 @@ if __name__ == "__main__":
 
     end_token_idx = output_vocab.token_index[input.END_TOKEN]
     epoch_losses = []
+    epoch_ratios = []
+    epoch_ratios_train = []
     total_tokens = sum(map(lambda t: len(t[0]), train_data))
 
     for epoch in range(EPOCHES):
         losses = []
 
         for batch in tqdm(input.iterate_batches(train_data, BATCH_SIZE, mem_limit=MEM_LIMIT), total=2*total_tokens / BATCH_SIZE):
-            # tokens = sum(map(lambda t: len(t[0]), batch))
-            # min_len = min(map(lambda t: len(t[0]), batch))
-            # max_len = max(map(lambda t: len(t[0]), batch))
-            # log.info("Batch_len=%d, tokens=%d, min=%d, max=%d, mem=%d",
-            #          len(batch), sum(map(lambda t: len(t[0]), batch)), min_len, max_len, tokens*max_len)
             optimizer.zero_grad()
             input_packed, output_sequences = input.encode_batch(batch, input_vocab, cuda=args.cuda)
 
@@ -126,7 +160,12 @@ if __name__ == "__main__":
             batch_loss.backward()
             optimizer.step()
             losses.append(batch_loss.cpu().data.numpy() / max_out_len)
-        log.info("Epoch %d: mean_loss=%.4f", epoch, np.mean(losses))
+        test_ratio = test_model(encoder, decoder, input_vocab, output_vocab, test_data, cuda=args.cuda)
+        train_ratio = test_model(encoder, decoder, input_vocab, output_vocab, random.sample(train_data, 500), cuda=args.cuda)
+        log.info("Epoch %d: mean_loss=%.4f, test_ratio=%.3f%%, train_ratio=%.3f%%", epoch, np.mean(losses),
+                 test_ratio * 100.0, train_ratio * 100.0)
+        epoch_ratios.append(test_ratio)
+        epoch_ratios_train.append(train_ratio)
         epoch_losses.append(np.mean(losses))
-        plots.plot_progress(epoch_losses, os.path.join(save_path, "status.html"))
+        plots.plot_progress(epoch_losses, epoch_ratios, epoch_ratios_train, os.path.join(save_path, "status.html"))
     pass
