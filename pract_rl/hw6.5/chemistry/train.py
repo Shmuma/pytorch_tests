@@ -20,13 +20,13 @@ from torch.autograd import Variable
 
 
 SEED = 2345  # obtained from fair dice roll, do not change!
-HIDDEN_SIZE = 512
+HIDDEN_SIZE = 128
 
 EPOCHES = 100
 # batch size is in tokens, not in sequences
 BATCH_SIZE = 10000
 # limit is in BATCH_TOKENS * max_sequence_len
-MEM_LIMIT = BATCH_SIZE * 10
+MEM_LIMIT = BATCH_SIZE * 20
 
 
 log = logging.getLogger("train")
