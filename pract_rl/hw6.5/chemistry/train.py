@@ -27,7 +27,7 @@ EPOCHES = 10000
 BATCH_SIZE = 5000
 # limit is in BATCH_TOKENS * max_sequence_len
 MEM_LIMIT = BATCH_SIZE * 10
-
+GRAD_CLIP = 5.0
 
 log = logging.getLogger("train")
 
@@ -107,7 +107,7 @@ if __name__ == "__main__":
     if args.cuda:
         encoder.cuda()
         decoder.cuda()
-    optimizer = optim.Adam(itertools.chain(encoder.parameters(), decoder.parameters()), lr=0.0001)
+    optimizer = optim.Adam(itertools.chain(encoder.parameters(), decoder.parameters()), lr=0.01)
 
     end_token_idx = output_vocab.token_index[input.END_TOKEN]
     epoch_losses = []
@@ -159,6 +159,8 @@ if __name__ == "__main__":
                     batch_loss += loss
             batch_loss /= max_out_len
             batch_loss.backward()
+            torch.nn.utils.clip_grad_norm(encoder.parameters(), GRAD_CLIP)
+            torch.nn.utils.clip_grad_norm(decoder.parameters(), GRAD_CLIP)
             optimizer.step()
             losses.append(batch_loss.cpu().data.numpy())
         test_ratio = test_model(encoder, decoder, input_vocab, output_vocab, test_data, cuda=args.cuda)
