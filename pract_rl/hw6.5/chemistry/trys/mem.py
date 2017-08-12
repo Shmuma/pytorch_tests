@@ -9,7 +9,6 @@ import torch
 import torch.optim as optim
 import torch.nn as nn
 import torch.nn.functional as nn_func
-import torch.nn.utils.rnn as rnn_utils
 from torch.autograd import Variable
 
 
@@ -17,7 +16,7 @@ INPUT_SIZE = 10
 HIDDEN_SIZE = 512
 BATCHES_TO_ITERATE = 1000
 BATCH_SIZE = 200
-INPUT_SEQ_LEN = 100
+INPUT_SEQ_LEN = 400
 
 # Initial results:
 
@@ -29,6 +28,9 @@ INPUT_SEQ_LEN = 100
 # input_seq_len = 5: 571MB
 # input_seq_len = 50: 1583MB
 # input_seq_len = 100: 2700MB
+# input_seq_len = 200: 4957MB
+# input_seq_len = 300: 7200MB
+# input_seq_len = 400: 9500MB
 # input_seq_len = 500: OOM
 
 
