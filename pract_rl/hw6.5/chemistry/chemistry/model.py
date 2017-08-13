@@ -28,4 +28,14 @@ class Decoder(nn.Module):
         out = self.out(ys)
         return out, h
 
+    def reorder_hidden(self, hidden, order):
+        """
+        Reorder hidden along the batch dimension
+        :param hidden: 
+        :param order: 
+        :return: 
+        """
+        if isinstance(hidden, tuple):
+            return tuple(torch.index_select(v, dim=1, index=order) for v in hidden)
+
 pass

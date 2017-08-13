@@ -126,43 +126,53 @@ if __name__ == "__main__":
 
             hid = encoder(input_packed)
 
-            # input for decoder
-            input_token_indices = torch.LongTensor([end_token_idx]).repeat(len(batch), 1)
-            max_out_len = max(map(len, output_sequences)) + 1 # extra item for final END_TOKEN
-            # expected tokens. We encode it at once and transposed, so our valid indices will be at rows
-            # TODO: masking https://discuss.pytorch.org/t/how-can-i-compute-seq2seq-loss-using-mask/861/16
-            valid_token_indices = np.full(shape=(max_out_len, len(batch)), fill_value=end_token_idx, dtype=np.int64)
-            for idx, out_seq in enumerate(output_sequences):
-                valid_token_indices[:len(out_seq), idx] = [output_vocab.token_index[c] for c in out_seq]
-            valid_token_indices_v = Variable(torch.from_numpy(valid_token_indices))
+            # will it be "trainer mode" batch or we'll feed output from decoder on every step
+            if random.random() < TRAINER_RATIO:
+                # prepare input
+                # get order which sorts our output sequences by decrease
+                out_sort = list(range(len(output_sequences)))
+                out_sort.sort(key=lambda idx: len(output_sequences[idx]), reverse=True)
+                out_sort = Variable(torch.from_numpy(np.array(out_sort, dtype=np.int64)))
+                new_hid = decoder.reorder_hidden(hid, out_sort)
+                pass
+            else:
+                # input for decoder
+                input_token_indices = torch.LongTensor([end_token_idx]).repeat(len(batch), 1)
+                max_out_len = max(map(len, output_sequences)) + 1 # extra item for final END_TOKEN
+                # expected tokens. We encode it at once and transposed, so our valid indices will be at rows
+                # TODO: masking https://discuss.pytorch.org/t/how-can-i-compute-seq2seq-loss-using-mask/861/16
+                valid_token_indices = np.full(shape=(max_out_len, len(batch)), fill_value=end_token_idx, dtype=np.int64)
+                for idx, out_seq in enumerate(output_sequences):
+                    valid_token_indices[:len(out_seq), idx] = [output_vocab.token_index[c] for c in out_seq]
+                valid_token_indices_v = Variable(torch.from_numpy(valid_token_indices))
 
-            input_emb = torch.FloatTensor(len(batch), len(output_vocab))
-            if args.cuda:
-                input_emb = input_emb.cuda()
-                input_token_indices = input_token_indices.cuda()
-                valid_token_indices_v = valid_token_indices_v.cuda()
+                input_emb = torch.FloatTensor(len(batch), len(output_vocab))
+                if args.cuda:
+                    input_emb = input_emb.cuda()
+                    input_token_indices = input_token_indices.cuda()
+                    valid_token_indices_v = valid_token_indices_v.cuda()
 
-            # iterate decoder over largest sequence
-            batch_loss = None
+                # iterate decoder over largest sequence
+                batch_loss = None
 
-            for ofs in range(max_out_len):
-                # fill input embeddings with one-hot
-                input_emb.zero_()
-                input_emb.scatter_(1, input_token_indices, 1.0)
+                for ofs in range(max_out_len):
+                    # fill input embeddings with one-hot
+                    input_emb.zero_()
+                    input_emb.scatter_(1, input_token_indices, 1.0)
 
-                # on first iteration pass hidden from encoder
-                dec_out, hid = decoder(Variable(input_emb), hid)
-                if random.random() < TRAINER_RATIO:
-                    input_token_indices = valid_token_indices_v[ofs].data.unsqueeze(dim=1)
-                else:
-                    # sample next tokens for decoder's input
-                    input_token_indices = torch.multinomial(nn_func.softmax(dec_out), num_samples=1).data
-                loss = nn_func.cross_entropy(dec_out, valid_token_indices_v[ofs])
-                if batch_loss is None:
-                    batch_loss = loss
-                else:
-                    batch_loss += loss
-            batch_loss /= max_out_len
+                    # on first iteration pass hidden from encoder
+                    dec_out, hid = decoder(Variable(input_emb), hid)
+                    if random.random() < TRAINER_RATIO:
+                        input_token_indices = valid_token_indices_v[ofs].data.unsqueeze(dim=1)
+                    else:
+                        # sample next tokens for decoder's input
+                        input_token_indices = torch.multinomial(nn_func.softmax(dec_out), num_samples=1).data
+                    loss = nn_func.cross_entropy(dec_out, valid_token_indices_v[ofs])
+                    if batch_loss is None:
+                        batch_loss = loss
+                    else:
+                        batch_loss += loss
+                batch_loss /= max_out_len
             batch_loss.backward()
             torch.nn.utils.clip_grad_norm(encoder.parameters(), GRAD_CLIP)
             torch.nn.utils.clip_grad_norm(decoder.parameters(), GRAD_CLIP)
