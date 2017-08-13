@@ -119,6 +119,7 @@ if __name__ == "__main__":
     for epoch in range(EPOCHES):
         losses = []
 
+        ts = time.time()
         for batch in tqdm(input.iterate_batches(train_data, BATCH_SIZE, mem_limit=MEM_LIMIT), total=2*total_tokens / BATCH_SIZE):
             optimizer.zero_grad()
             input_packed, output_sequences = input.encode_batch(batch, input_vocab, cuda=args.cuda)
@@ -169,8 +170,9 @@ if __name__ == "__main__":
             losses.append(batch_loss.cpu().data.numpy())
         test_ratio = test_model(encoder, decoder, input_vocab, output_vocab, test_data, cuda=args.cuda)
         train_ratio = test_model(encoder, decoder, input_vocab, output_vocab, random.sample(train_data, 500), cuda=args.cuda)
-        log.info("Epoch %d: mean_loss=%.4f, test_ratio=%.3f%%, train_ratio=%.3f%%", epoch, np.mean(losses),
-                 test_ratio * 100.0, train_ratio * 100.0)
+        speed = total_tokens / (time.time() - ts)
+        log.info("Epoch %d: mean_loss=%.4f, test_ratio=%.3f%%, train_ratio=%.3f%%, speed=%.3f tokens/s",
+                 epoch, np.mean(losses), test_ratio * 100.0, train_ratio * 100.0, speed)
         epoch_ratios.append(test_ratio)
         epoch_ratios_train.append(train_ratio)
         epoch_losses.append(np.mean(losses))
