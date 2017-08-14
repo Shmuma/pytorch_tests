@@ -89,3 +89,21 @@ def iterate_batches(data, batch_tokens, mem_limit):
         batch_len += 1
     if tokens > 0:
         yield data[batch_start:batch_start+batch_len]
+
+
+def encode_output_batch(sequences, output_vocab):
+    """
+    Encode list of sequences into decoder's input and create valid indices sequences
+    :param sequences: list of sorted sequences
+    :param output_vocab:
+    :return: Tuple with PackedSequence, Variable with valid indices
+    """
+    assert isinstance(sequences, list)
+    assert isinstance(output_vocab, Vocabulary)
+
+    lens = list(map(len, sequences))
+    batch_emb = np.zeros(shape=(len(sequences), lens[0], len(output_vocab)), dtype=np.float32)
+    end_token_idx = output_vocab.token_index[END_TOKEN]
+    batch_emb[:, :, end_token_idx] = 1.0
+    for seq_idx, sequence in enumerate(sequences):
+        for

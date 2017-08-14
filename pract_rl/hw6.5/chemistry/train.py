@@ -134,6 +134,11 @@ if __name__ == "__main__":
                 out_sort.sort(key=lambda idx: len(output_sequences[idx]), reverse=True)
                 out_sort = Variable(torch.from_numpy(np.array(out_sort, dtype=np.int64)))
                 new_hid = decoder.reorder_hidden(hid, out_sort)
+                # prepare padded data
+                output_sequences.sort(key=len, revese=True)
+                input_packed, output_indices = input.encode_output_batch(output_sequences, output_vocab)
+                dec_out, _ = decoder(input_packed, new_hid)
+                batch_loss = nn_func.cross_entropy(dec_out, output_indices)
                 pass
             else:
                 # input for decoder
