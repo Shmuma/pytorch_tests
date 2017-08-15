@@ -29,6 +29,7 @@ BATCH_SIZE = 5000
 MEM_LIMIT = BATCH_SIZE * 5
 GRAD_CLIP = 5.0
 TRAINER_RATIO = 1.0
+FAST_TRAINER_MODE = False
 
 log = logging.getLogger("train")
 
@@ -128,7 +129,7 @@ if __name__ == "__main__":
             hid = encoder(input_packed)
 
             # will it be "trainer mode" batch or we'll feed output from decoder on every step
-            if trainer_mode:
+            if trainer_mode and FAST_TRAINER_MODE:
                 # prepare input
                 # get order which sorts our output sequences by decrease
                 out_sort = list(range(len(output_sequences)))
@@ -169,7 +170,7 @@ if __name__ == "__main__":
 
                     # on first iteration pass hidden from encoder
                     dec_out, hid = decoder(Variable(input_emb), hid)
-                    if random.random() < TRAINER_RATIO:
+                    if trainer_mode:
                         input_token_indices = valid_token_indices_v[ofs].data.unsqueeze(dim=1)
                     else:
                         # sample next tokens for decoder's input
