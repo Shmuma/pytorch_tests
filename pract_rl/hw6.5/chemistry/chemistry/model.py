@@ -1,6 +1,6 @@
 import torch
 import torch.nn as nn
-from torch.autograd import Variable
+import torch.nn.utils.rnn as rnn_utils
 
 
 class Encoder(nn.Module):
@@ -22,9 +22,13 @@ class Decoder(nn.Module):
         self.out = nn.Linear(hidden_size, output_size)
 
     def forward(self, x, h):
-        # input has to be batch*embedding, i.e. contain only one time stamp
-        y, h = self.rnn(x.unsqueeze(dim=1), h)
-        ys = y.squeeze(dim=1)
+        if isinstance(x, rnn_utils.PackedSequence):
+            y, h = self.rnn(x, h)
+            ys = y.data
+        else:
+            # input has to be batch*embedding, i.e. contain only one time stamp
+            y, h = self.rnn(x.unsqueeze(dim=1), h)
+            ys = y.squeeze(dim=1)
         out = self.out(ys)
         return out, h
 

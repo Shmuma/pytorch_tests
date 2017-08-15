@@ -26,9 +26,9 @@ EPOCHES = 10000
 # batch size is in tokens, not in sequences
 BATCH_SIZE = 5000
 # limit is in BATCH_TOKENS * max_sequence_len
-MEM_LIMIT = BATCH_SIZE * 10
+MEM_LIMIT = BATCH_SIZE * 5
 GRAD_CLIP = 5.0
-TRAINER_RATIO = 0.5
+TRAINER_RATIO = 1.0
 
 log = logging.getLogger("train")
 
@@ -121,25 +121,27 @@ if __name__ == "__main__":
 
         ts = time.time()
         for batch in tqdm(input.iterate_batches(train_data, BATCH_SIZE, mem_limit=MEM_LIMIT), total=2*total_tokens / BATCH_SIZE):
+            trainer_mode = random.random() < TRAINER_RATIO
             optimizer.zero_grad()
             input_packed, output_sequences = input.encode_batch(batch, input_vocab, cuda=args.cuda)
 
             hid = encoder(input_packed)
 
             # will it be "trainer mode" batch or we'll feed output from decoder on every step
-            if random.random() < TRAINER_RATIO:
+            if trainer_mode:
                 # prepare input
                 # get order which sorts our output sequences by decrease
                 out_sort = list(range(len(output_sequences)))
                 out_sort.sort(key=lambda idx: len(output_sequences[idx]), reverse=True)
                 out_sort = Variable(torch.from_numpy(np.array(out_sort, dtype=np.int64)))
+                if args.cuda:
+                    out_sort = out_sort.cuda()
                 new_hid = decoder.reorder_hidden(hid, out_sort)
                 # prepare padded data
-                output_sequences.sort(key=len, revese=True)
-                input_packed, output_indices = input.encode_output_batch(output_sequences, output_vocab)
+                output_sequences.sort(key=len, reverse=True)
+                input_packed, output_indices = input.encode_output_batch(output_sequences, output_vocab, cuda=args.cuda)
                 dec_out, _ = decoder(input_packed, new_hid)
                 batch_loss = nn_func.cross_entropy(dec_out, output_indices)
-                pass
             else:
                 # input for decoder
                 input_token_indices = torch.LongTensor([end_token_idx]).repeat(len(batch), 1)

@@ -67,7 +67,7 @@ def encode_batch(input_batch, vocab, cuda=False, volatile=False):
     if cuda:
         padded_v = padded_v.cuda()
     input_packed = rnn_utils.pack_padded_sequence(padded_v, lens, batch_first=True)
-    return input_packed, output_data
+    return input_packed, list(output_data)
 
 
 def iterate_batches(data, batch_tokens, mem_limit):
@@ -91,7 +91,7 @@ def iterate_batches(data, batch_tokens, mem_limit):
         yield data[batch_start:batch_start+batch_len]
 
 
-def encode_output_batch(sequences, output_vocab):
+def encode_output_batch(sequences, output_vocab, cuda=False):
     """
     Encode list of sequences into decoder's input and create valid indices sequences
     :param sequences: list of sorted sequences
@@ -101,9 +101,22 @@ def encode_output_batch(sequences, output_vocab):
     assert isinstance(sequences, list)
     assert isinstance(output_vocab, Vocabulary)
 
-    lens = list(map(len, sequences))
-    batch_emb = np.zeros(shape=(len(sequences), lens[0], len(output_vocab)), dtype=np.float32)
     end_token_idx = output_vocab.token_index[END_TOKEN]
-    batch_emb[:, :, end_token_idx] = 1.0
-    for seq_idx, sequence in enumerate(sequences):
-        for
+    lens = list(map(len, sequences))
+    input_emb = np.zeros(shape=(len(sequences), lens[0], len(output_vocab)), dtype=np.float32)
+    output_indices = np.full(shape=(len(sequences), lens[0]), fill_value=end_token_idx, dtype=np.int64)
+    input_emb[:, :, end_token_idx] = 1.0
+    for seq_ofs, sequence in enumerate(sequences):
+        for token_ofs, token in enumerate(sequence):
+            token_idx = output_vocab.token_index[token]
+            input_emb[seq_ofs, token_ofs, token_idx] = 1.0
+            if token_ofs > 0:
+                output_indices[seq_ofs, token_ofs-1] = token_idx
+    input_v = Variable(torch.from_numpy(input_emb))
+    output_v = Variable(torch.from_numpy(output_indices))
+    if cuda:
+        input_v = input_v.cuda()
+        output_v = output_v.cuda()
+    input_packed = rnn_utils.pack_padded_sequence(input_v, lens, batch_first=True)
+    output_packed = rnn_utils.pack_padded_sequence(output_v, lens, batch_first=True)
+    return input_packed, output_packed.data
