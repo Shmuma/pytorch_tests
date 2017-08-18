@@ -98,8 +98,8 @@ if __name__ == "__main__":
     # split into train/test
     train_data, test_data = input.split_train_test(data, ratio=0.9)
     if args.tiny:
-        train_data = train_data[:1000]
-        test_data = test_data[:200]
+        train_data = train_data[:200]
+        test_data = test_data[:50]
     train_data.sort(key=lambda t: len(t[0]))
     log.info("Train has %d items, test %d", len(train_data), len(test_data))
 
