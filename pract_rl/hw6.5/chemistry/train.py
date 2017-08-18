@@ -29,7 +29,7 @@ BATCH_SIZE = 5000
 MEM_LIMIT = BATCH_SIZE * 5
 GRAD_CLIP = 5.0
 TRAINER_RATIO = 1.0
-FAST_TRAINER_MODE = False
+FAST_TRAINER_MODE = True
 
 log = logging.getLogger("train")
 
@@ -134,12 +134,12 @@ if __name__ == "__main__":
                 # get order which sorts our output sequences by decrease
                 out_sort = list(range(len(output_sequences)))
                 out_sort.sort(key=lambda idx: len(output_sequences[idx]), reverse=True)
-                out_sort = Variable(torch.from_numpy(np.array(out_sort, dtype=np.int64)))
+                out_sort_v = Variable(torch.from_numpy(np.array(out_sort, dtype=np.int64)))
                 if args.cuda:
-                    out_sort = out_sort.cuda()
-                new_hid = decoder.reorder_hidden(hid, out_sort)
+                    out_sort_v = out_sort_v.cuda()
+                new_hid = decoder.reorder_hidden(hid, out_sort_v)
                 # prepare padded data
-                output_sequences.sort(key=len, reverse=True)
+                output_sequences = [output_sequences[out_sort[idx]] for idx in range(len(output_sequences))]
                 input_packed, output_indices = input.encode_output_batch(output_sequences, output_vocab, cuda=args.cuda)
                 dec_out, _ = decoder(input_packed, new_hid)
                 batch_loss = nn_func.cross_entropy(dec_out, output_indices)
@@ -187,7 +187,7 @@ if __name__ == "__main__":
             optimizer.step()
             losses.append(batch_loss.cpu().data.numpy())
         test_ratio = test_model(encoder, decoder, input_vocab, output_vocab, test_data, cuda=args.cuda)
-        train_ratio = test_model(encoder, decoder, input_vocab, output_vocab, random.sample(train_data, 500), cuda=args.cuda)
+        train_ratio = test_model(encoder, decoder, input_vocab, output_vocab, train_data, cuda=args.cuda)
         speed = total_tokens / (time.time() - ts)
         log.info("Epoch %d: mean_loss=%.4f, test_ratio=%.3f%%, train_ratio=%.3f%%, speed=%.3f tokens/s",
                  epoch, np.mean(losses), test_ratio * 100.0, train_ratio * 100.0, speed)
