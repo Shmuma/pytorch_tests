@@ -22,13 +22,17 @@ from torch.autograd import Variable
 SEED = 2345  # obtained from fair dice roll, do not change!
 HIDDEN_SIZE = 512
 
+GRAD_CLIP = 1.0
 EPOCHES = 10000
 # batch size is in tokens, not in sequences
 BATCH_SIZE = 5000
 # limit is in BATCH_TOKENS * max_sequence_len
 MEM_LIMIT = BATCH_SIZE * 5
-GRAD_CLIP = 5.0
 TRAINER_RATIO = 0.5
+
+DECODER_HEADER_ENABLED = True
+# length of decoder sequence which will be backpropagated to the encoder
+DECODER_HEADER_LEN = 100
 
 log = logging.getLogger("train")
 
@@ -163,6 +167,25 @@ if __name__ == "__main__":
                     batch_loss = loss
                 else:
                     batch_loss += loss
+
+                # backpropagate over the head of sequence + encoder steps. This allows to reduce GPU memory footprint
+                if DECODER_HEADER_ENABLED and ofs == DECODER_HEADER_LEN:
+                    batch_loss /= DECODER_HEADER_LEN
+                    batch_loss.backward()
+                    torch.nn.utils.clip_grad_norm(encoder.parameters(), GRAD_CLIP)
+                    torch.nn.utils.clip_grad_norm(decoder.parameters(), GRAD_CLIP)
+                    optimizer.step()
+                    optimizer.zero_grad()
+                    batch_loss = None
+                    if isinstance(hid, tuple):
+                        for h in hid:
+                            h.detach_()
+                    else:
+                        hid.detach_()
+
+            # here we backpropagate only through the rest of decoder's steps. This has a downside of short-term dependency
+            # of decoded tail on encoder, but we assume that influence of decoder head will be enough.
+            # As a positive effect, our GPU memory footprint is predictable now.
             batch_loss /= max_out_len
             batch_loss.backward()
             torch.nn.utils.clip_grad_norm(encoder.parameters(), GRAD_CLIP)
