@@ -17,6 +17,7 @@ HIDDEN_SIZE = 512
 BATCHES_TO_ITERATE = 1000
 BATCH_SIZE = 200
 INPUT_SEQ_LEN = 400
+DECODER_HEAD_LEN = 100
 
 # Initial results:
 
@@ -74,6 +75,18 @@ if __name__ == "__main__":
             else:
                 sum_loss += loss
 
+            # backpropagate over the head of sequence + encoder steps. This allows to reduce GPU memory footprint
+            if ofs == DECODER_HEAD_LEN:
+                sum_loss.backward()
+                optimizer.step()
+                optimizer.zero_grad()
+                sum_loss = None
+                for h in rnn_h:
+                    h.detach_()
+
+        # here we backpropagate only through the rest of decoder's steps. This has a downside of short-term dependency
+        # of decoded tail on encoder, but we assume that influence of decoder head will be enough.
+        # As a positive effect, our GPU memory footprint is predictable now.
         sum_loss.backward()
         optimizer.step()
         pass
