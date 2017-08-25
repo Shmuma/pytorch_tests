@@ -70,25 +70,28 @@ def encode_batch(input_batch, vocab, cuda=False, volatile=False):
     return input_packed, list(output_data)
 
 
-def iterate_batches(data, batch_tokens, mem_limit):
+def split_batches(data, batch_tokens):
+    """
+    Return chunk bounds for batches
+    :param data: list of input,output sequences
+    :param batch_tokens: limit of tokens in the batch
+    :return: list of tuples with start:end bounds of batch
+    """
+    res = []
     tokens = 0
     batch_start = 0
     batch_len = 0
-    max_len = 0
     while batch_start + batch_len < len(data):
-        mem_footprint = tokens * max_len
-        if tokens >= batch_tokens or mem_footprint > mem_limit:
-            yield data[batch_start:batch_start+batch_len]
+        if tokens >= batch_tokens:
+            res.append((batch_start, batch_start+batch_len))
             batch_start += batch_len
             batch_len = 0
             tokens = 0
-            max_len = 0
-        l = len(data[batch_start+batch_len][0])
-        max_len = max(max_len, l)
-        tokens += l
+        tokens += len(data[batch_start+batch_len][0]) + len(data[batch_start+batch_len][1])
         batch_len += 1
     if tokens > 0:
-        yield data[batch_start:batch_start+batch_len]
+        res.append((batch_start, batch_start+batch_len))
+    return res
 
 
 def encode_output_batch(sequences, output_vocab, cuda=False):

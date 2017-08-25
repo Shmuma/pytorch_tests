@@ -25,9 +25,7 @@ HIDDEN_SIZE = 512
 GRAD_CLIP = 1.0
 EPOCHES = 10000
 # batch size is in tokens, not in sequences
-BATCH_SIZE = 10000
-# limit is in BATCH_TOKENS * max_sequence_len
-MEM_LIMIT = BATCH_SIZE
+BATCH_SIZE = 5000
 TRAINER_RATIO = 0.5
 
 DECODER_HEADER_ENABLED = True
@@ -103,7 +101,7 @@ if __name__ == "__main__":
     if args.tiny:
         train_data = train_data[:200]
         test_data = test_data[:50]
-    train_data.sort(key=lambda t: len(t[0]))
+#    train_data.sort(key=lambda t: len(t[0]))
     log.info("Train has %d items, test %d", len(train_data), len(test_data))
 
     # train
@@ -124,7 +122,10 @@ if __name__ == "__main__":
         losses = []
 
         ts = time.time()
-        for batch in tqdm(input.iterate_batches(train_data, BATCH_SIZE, mem_limit=MEM_LIMIT), total=2*total_tokens / BATCH_SIZE):
+        random.shuffle(data)
+        batch_bounds = input.split_batches(train_data, BATCH_SIZE)
+        for batch_start, batch_end in tqdm(batch_bounds):
+            batch = data[batch_start:batch_end]
             trainer_mode = random.random() < TRAINER_RATIO
             optimizer.zero_grad()
             input_packed, output_sequences = input.encode_batch(batch, input_vocab, cuda=args.cuda)
@@ -183,6 +184,7 @@ if __name__ == "__main__":
                             h.detach_()
                     else:
                         hid.detach_()
+                    break
 
             # here we backpropagate only through the rest of decoder's steps. This has a downside of short-term dependency
             # of decoded tail on encoder, but we assume that influence of decoder head will be enough.
