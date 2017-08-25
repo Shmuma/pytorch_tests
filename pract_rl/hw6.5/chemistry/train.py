@@ -25,9 +25,9 @@ HIDDEN_SIZE = 512
 GRAD_CLIP = 1.0
 EPOCHES = 10000
 # batch size is in tokens, not in sequences
-BATCH_SIZE = 5000
+BATCH_SIZE = 10000
 # limit is in BATCH_TOKENS * max_sequence_len
-MEM_LIMIT = BATCH_SIZE * 5
+MEM_LIMIT = BATCH_SIZE
 TRAINER_RATIO = 0.5
 
 DECODER_HEADER_ENABLED = True
