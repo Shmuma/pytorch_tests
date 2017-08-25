@@ -172,6 +172,7 @@ if __name__ == "__main__":
                 if DECODER_HEADER_ENABLED and ofs == DECODER_HEADER_LEN:
                     batch_loss /= DECODER_HEADER_LEN
                     batch_loss.backward()
+                    losses.append(batch_loss.cpu().data.numpy())
                     torch.nn.utils.clip_grad_norm(encoder.parameters(), GRAD_CLIP)
                     torch.nn.utils.clip_grad_norm(decoder.parameters(), GRAD_CLIP)
                     optimizer.step()
@@ -186,12 +187,13 @@ if __name__ == "__main__":
             # here we backpropagate only through the rest of decoder's steps. This has a downside of short-term dependency
             # of decoded tail on encoder, but we assume that influence of decoder head will be enough.
             # As a positive effect, our GPU memory footprint is predictable now.
-            batch_loss /= max_out_len
-            batch_loss.backward()
-            torch.nn.utils.clip_grad_norm(encoder.parameters(), GRAD_CLIP)
-            torch.nn.utils.clip_grad_norm(decoder.parameters(), GRAD_CLIP)
-            optimizer.step()
-            losses.append(batch_loss.cpu().data.numpy())
+            if batch_loss is not None:
+                batch_loss /= max_out_len
+                batch_loss.backward()
+                torch.nn.utils.clip_grad_norm(encoder.parameters(), GRAD_CLIP)
+                torch.nn.utils.clip_grad_norm(decoder.parameters(), GRAD_CLIP)
+                optimizer.step()
+                losses.append(batch_loss.cpu().data.numpy())
         test_ratio = test_model(encoder, decoder, input_vocab, output_vocab, test_data, cuda=args.cuda)
         train_ratio = test_model(encoder, decoder, input_vocab, output_vocab, train_data, cuda=args.cuda)
         speed = total_tokens / (time.time() - ts)
