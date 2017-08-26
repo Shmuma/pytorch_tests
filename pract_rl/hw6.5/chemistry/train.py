@@ -19,13 +19,16 @@ import torch.optim as optim
 from torch.autograd import Variable
 
 
+INPUT_LIMIT = 50
+OUTPUT_LIMIT = 50
+
 SEED = 2345  # obtained from fair dice roll, do not change!
 HIDDEN_SIZE = 512
 
 GRAD_CLIP = 1.0
 EPOCHES = 10000
 # batch size is in tokens, not in sequences
-BATCH_SIZE = 5000
+BATCH_SIZE = 10000
 TRAINER_RATIO = 0.5
 
 DECODER_HEADER_ENABLED = True
@@ -83,16 +86,12 @@ if __name__ == "__main__":
     parser.add_argument("--cuda", action='store_true', default=False, help="Enable cuda mode")
     parser.add_argument("--name", required=True, help="Name of directory to save models to")
     parser.add_argument("--tiny", default=False, action='store_true', help="Limit amount of samples to 5000")
-    parser.add_argument("--small", default=False, action='store_true',
-                        help="Limit amount of samples to smaller than decoder header len")
     args = parser.parse_args()
 
     save_path = os.path.join("saves", args.name)
     if args.tiny:
         save_path += "-tiny"
-    if args.small:
-        save_path += "-small"
-    os.makedirs(save_path, exist_ok=args.tiny or args.small)
+    os.makedirs(save_path, exist_ok=args.tiny)
 
     # read dataset
     data = input.read_data()
@@ -110,10 +109,10 @@ if __name__ == "__main__":
     if args.tiny:
         train_data = train_data[:200]
         test_data = test_data[:50]
-    if args.small:
-        f = lambda l: list(filter(lambda p: len(p[1]) <= DECODER_HEADER_LEN, l))
-        train_data = f(train_data)
-        test_data = f(test_data)
+    # apply input/output limits
+    pred = lambda l: list(filter(lambda p: len(p[0]) <= INPUT_LIMIT and len(p[1]) <= OUTPUT_LIMIT, l))
+    train_data = pred(train_data)
+    test_data = pred(test_data)
     log.info("Train has %d items, test %d", len(train_data), len(test_data))
 
     # train
