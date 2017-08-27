@@ -57,6 +57,9 @@ def test_model(net_encoder, net_decoder, input_vocab, output_vocab, test_data, c
             input_emb = input_emb.cuda()
             input_token_indices = input_token_indices.cuda()
 
+        dec_hid = None
+        if isinstance(hid, tuple):
+            hid = torch.cat(hid, dim=2).squeeze(dim=0)
 
         for ofs in range(max_out_len):
             input_emb.zero_()
@@ -64,8 +67,9 @@ def test_model(net_encoder, net_decoder, input_vocab, output_vocab, test_data, c
             input_emb_v = Variable(input_emb, volatile=True)
             if cuda:
                 input_emb_v = input_emb_v.cuda()
+            dec_input = torch.cat([input_emb_v, hid], dim=1)
 
-            dec_out, hid = net_decoder(input_emb_v, hid)
+            dec_out, dec_hid = net_decoder(dec_input, dec_hid)
             input_token_indices = torch.multinomial(nn_func.softmax(dec_out), num_samples=1).data
             for seq_idx, token in enumerate(input_token_indices):
                 cur_seq = output_sequences[seq_idx]
