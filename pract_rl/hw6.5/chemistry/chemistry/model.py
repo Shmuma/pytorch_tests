@@ -17,9 +17,10 @@ class Encoder(nn.Module):
         batch, dim
         """
         _, hidden = self.rnn(x, h)
-        # for LSTM, we have hidden state and cell state tuple,
-        # which we need to concat
-        hidden = torch.cat(hidden, dim=0)
+        if True:
+            # for LSTM, we have hidden state and cell state tuple,
+            # which we need to concat
+            hidden = torch.cat(hidden, dim=0)
         # swap dimensions to make batch first dim
         hidden = torch.transpose(hidden, 0, 1)
         # flatten on last two dimensions
