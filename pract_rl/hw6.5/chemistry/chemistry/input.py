@@ -1,4 +1,5 @@
 import random
+import string
 import pandas as pd
 import numpy as np
 
@@ -17,6 +18,30 @@ def read_data(file_name=FILE_NAME):
     df = df[df.molecular_formula.apply(is_str) & df.common_name.apply(is_str)]
     filter_fn = lambda s: s.replace("\n", "")
     return list(zip(df.molecular_formula, map(filter_fn, df.common_name)))
+
+
+def generate_dataset(dataset_kind, samples_count=10000, input_size=10):
+    """
+    Generate synthetic dataset for verification. Currently those kinds are supported:
+    1. first_last: generate random word, output should be first and last letter
+    2. count: by random sequence and digit repeat digit given amount of times
+    :param dataset_kind:
+    :return: list of tuples
+    """
+    chars = list(string.ascii_lowercase)
+    if dataset_kind == 'first_last':
+        input_data = ["".join(np.random.choice(chars, input_size, replace=True).tolist()) for _ in range(samples_count)]
+        result = [(s, s[0] + s[-1]) for s in input_data]
+        return result
+    elif dataset_kind == 'count':
+        input_data = ["".join(np.random.choice(chars, 3, replace=True).tolist()) for _ in range(samples_count)]
+        result = []
+        for s in input_data:
+            c = np.random.choice(range(10))
+            result.append(("%s%d" % (s, c), s * c))
+        return result
+    else:
+        raise ValueError
 
 
 def split_train_test(data, ratio=0.8):

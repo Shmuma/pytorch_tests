@@ -90,6 +90,8 @@ if __name__ == "__main__":
     parser.add_argument("--cuda", action='store_true', default=False, help="Enable cuda mode")
     parser.add_argument("--name", required=True, help="Name of directory to save models to")
     parser.add_argument("--tiny", default=False, action='store_true', help="Limit amount of samples to 5000")
+    parser.add_argument("-d", "--data", choices=('orig', 'first_last', 'count'), default='orig',
+                        help="Dataset to use, default=orig")
     args = parser.parse_args()
 
     save_path = os.path.join("saves", args.name)
@@ -98,7 +100,11 @@ if __name__ == "__main__":
     os.makedirs(save_path, exist_ok=True)
 
     # read dataset
-    data = input.read_data()
+    if args.data == "orig":
+        data = input.read_data()
+    else:
+        data = input.generate_dataset(args.data)
+        print(data[:4])
     random.shuffle(data)
     log.info("Have %d samples", len(data))
 
