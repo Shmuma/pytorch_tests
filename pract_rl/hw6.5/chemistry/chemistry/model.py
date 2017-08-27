@@ -15,10 +15,10 @@ class Encoder(nn.Module):
 
 
 class Decoder(nn.Module):
-    def __init__(self, hidden_size, output_size):
+    def __init__(self, input_size, hidden_size, output_size):
         super(Decoder, self).__init__()
 
-        self.rnn = nn.LSTM(output_size, hidden_size, batch_first=True)
+        self.rnn = nn.LSTM(input_size, hidden_size, batch_first=True)
         self.out = nn.Linear(hidden_size, output_size)
 
     def forward(self, x, h):
@@ -35,9 +35,9 @@ class Decoder(nn.Module):
     def reorder_hidden(self, hidden, order):
         """
         Reorder hidden along the batch dimension
-        :param hidden: 
-        :param order: 
-        :return: 
+        :param hidden:
+        :param order:
+        :return:
         """
         if isinstance(hidden, tuple):
             return tuple(torch.index_select(v, dim=1, index=order) for v in hidden)

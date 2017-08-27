@@ -91,7 +91,7 @@ if __name__ == "__main__":
     save_path = os.path.join("saves", args.name)
     if args.tiny:
         save_path += "-tiny"
-    os.makedirs(save_path, exist_ok=args.tiny)
+    os.makedirs(save_path, exist_ok=True)
 
     # read dataset
     data = input.read_data()
@@ -117,7 +117,8 @@ if __name__ == "__main__":
 
     # train
     encoder = model.Encoder(input_size=len(input_vocab), hidden_size=HIDDEN_SIZE)
-    decoder = model.Decoder(hidden_size=HIDDEN_SIZE, output_size=len(output_vocab))
+    decoder = model.Decoder(input_size=HIDDEN_SIZE*2 + len(output_vocab),
+                            hidden_size=HIDDEN_SIZE, output_size=len(output_vocab))
     if args.cuda:
         encoder.cuda()
         decoder.cuda()
@@ -142,6 +143,9 @@ if __name__ == "__main__":
             input_packed, output_sequences = input.encode_batch(batch, input_vocab, cuda=args.cuda)
 
             hid = encoder(input_packed)
+            # in case of LSTM, hidden is tuple, concat them
+            if isinstance(hid, tuple):
+                hid = torch.cat(hid, dim=2).squeeze(dim=0)
 
             # input for decoder
             input_token_indices = torch.LongTensor([end_token_idx]).repeat(len(batch), 1)
@@ -161,14 +165,17 @@ if __name__ == "__main__":
 
             # iterate decoder over largest sequence
             batch_loss = None
+            # decoder hidden state
+            dec_hid = None
 
             for ofs in range(max_out_len):
                 # fill input embeddings with one-hot
                 input_emb.zero_()
                 input_emb.scatter_(1, input_token_indices, 1.0)
 
-                # on first iteration pass hidden from encoder
-                dec_out, hid = decoder(Variable(input_emb), hid)
+                # concatenate encoded state with input
+                dec_input = torch.cat([Variable(input_emb), hid], dim=1)
+                dec_out, dec_hid = decoder(dec_input, dec_hid)
                 if trainer_mode:
                     input_token_indices = valid_token_indices_v[ofs].data.unsqueeze(dim=1)
                 else:
