@@ -7,7 +7,7 @@ class Encoder(nn.Module):
     def __init__(self, input_size, hidden_size):
         super(Encoder, self).__init__()
 
-        self.rnn = nn.LSTM(input_size, hidden_size, batch_first=True, bidirectional=True)
+        self.rnn = nn.LSTM(input_size, hidden_size, batch_first=True, bidirectional=True, dropout=0.5)
 
     def forward(self, x, h=None):
         _, hidden = self.rnn(x, h)
@@ -18,7 +18,7 @@ class Decoder(nn.Module):
     def __init__(self, input_size, hidden_size, output_size):
         super(Decoder, self).__init__()
 
-        self.rnn = nn.LSTM(input_size, hidden_size, batch_first=True)
+        self.rnn = nn.LSTM(input_size, hidden_size, batch_first=True, dropout=0.5)
         self.out = nn.Linear(hidden_size, output_size)
 
     def forward(self, x, h):
