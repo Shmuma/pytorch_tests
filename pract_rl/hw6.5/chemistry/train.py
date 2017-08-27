@@ -127,7 +127,7 @@ if __name__ == "__main__":
 
     # train
     encoder = model.Encoder(input_size=len(input_vocab), hidden_size=HIDDEN_SIZE)
-    decoder = model.Decoder(input_size=HIDDEN_SIZE*2 + len(output_vocab),
+    decoder = model.Decoder(input_size=encoder.state_size() + len(output_vocab),
                             hidden_size=HIDDEN_SIZE, output_size=len(output_vocab))
     if args.cuda:
         encoder.cuda()
@@ -153,9 +153,6 @@ if __name__ == "__main__":
             input_packed, output_sequences = input.encode_batch(batch, input_vocab, cuda=args.cuda)
 
             hid = encoder(input_packed)
-            # in case of LSTM, hidden is tuple, concat them
-            if isinstance(hid, tuple):
-                hid = torch.cat(hid, dim=2).squeeze(dim=0)
 
             # input for decoder
             input_token_indices = torch.LongTensor([end_token_idx]).repeat(len(batch), 1)
