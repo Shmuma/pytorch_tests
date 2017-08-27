@@ -132,7 +132,7 @@ if __name__ == "__main__":
     if args.cuda:
         encoder.cuda()
         decoder.cuda()
-    optimizer = optim.Adam(itertools.chain(encoder.parameters(), decoder.parameters()), lr=0.001)
+    optimizer = optim.RMSprop(itertools.chain(encoder.parameters(), decoder.parameters()), lr=0.001)
 
     end_token_idx = output_vocab.token_index[input.END_TOKEN]
     epoch_losses = []
