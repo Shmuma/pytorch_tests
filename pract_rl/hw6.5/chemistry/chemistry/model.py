@@ -13,10 +13,12 @@ class Encoder(nn.Module):
 
     def forward(self, x, h=None):
         """
-        Return hidden state suitable to be fed into decoder's input, i.e. of size
+        Return output and hidden state suitable to be fed into decoder's input, i.e. of size
         batch, dim
+
+        Output could be used for attention
         """
-        _, hidden = self.rnn(x, h)
+        out, hidden = self.rnn(x, h)
         if True:
             # for LSTM, we have hidden state and cell state tuple,
             # which we need to concat
@@ -26,6 +28,7 @@ class Encoder(nn.Module):
         # flatten on last two dimensions
         hidden = hidden.clone()
         hidden = hidden.view(-1, hidden.size()[1]*hidden.size()[2])
+        print(out)
         return hidden
 
     def state_size(self):

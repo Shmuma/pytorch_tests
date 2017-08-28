@@ -95,7 +95,7 @@ def encode_batch(input_batch, vocab, cuda=False, volatile=False):
     return input_packed, list(output_data)
 
 
-def split_batches(data, batch_tokens):
+def split_batches(data, batch_tokens, max_sequences=None):
     """
     Return chunk bounds for batches
     :param data: list of input,output sequences
@@ -107,7 +107,7 @@ def split_batches(data, batch_tokens):
     batch_start = 0
     batch_len = 0
     while batch_start + batch_len < len(data):
-        if tokens >= batch_tokens:
+        if tokens >= batch_tokens or (max_sequences is not None and batch_len >= max_sequences):
             res.append((batch_start, batch_start+batch_len))
             batch_start += batch_len
             batch_len = 0

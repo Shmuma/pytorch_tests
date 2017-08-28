@@ -145,14 +145,14 @@ if __name__ == "__main__":
 
         ts = time.time()
         random.shuffle(data)
-        batch_bounds = input.split_batches(train_data, BATCH_SIZE)
+        batch_bounds = input.split_batches(train_data, BATCH_SIZE, max_sequences=16)
         for batch_start, batch_end in tqdm(batch_bounds):
             batch = data[batch_start:batch_end]
             trainer_mode = random.random() < TRAINER_RATIO
             optimizer.zero_grad()
             input_packed, output_sequences = input.encode_batch(batch, input_vocab, cuda=args.cuda)
 
-            hid = encoder(input_packed)
+            enc_out, hid = encoder(input_packed)
 
             # input for decoder
             input_token_indices = torch.LongTensor([end_token_idx]).repeat(len(batch), 1)
