@@ -127,8 +127,8 @@ if __name__ == "__main__":
 
     # train
     encoder = model.Encoder(input_size=len(input_vocab), hidden_size=HIDDEN_SIZE)
-    decoder = model.Decoder(input_size=encoder.state_size() + len(output_vocab),
-                            hidden_size=HIDDEN_SIZE, output_size=len(output_vocab))
+    decoder = model.AttentionDecoder(input_size=encoder.state_size() + len(output_vocab), hidden_size=HIDDEN_SIZE,
+                                     output_size=len(output_vocab), max_encoder_input=INPUT_LIMIT)
     if args.cuda:
         encoder.cuda()
         decoder.cuda()

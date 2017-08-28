@@ -28,8 +28,7 @@ class Encoder(nn.Module):
         # flatten on last two dimensions
         hidden = hidden.clone()
         hidden = hidden.view(-1, hidden.size()[1]*hidden.size()[2])
-        print(out)
-        return hidden
+        return out, hidden
 
     def state_size(self):
         # two layers, two direction * 2 (lstm hidden and cell)
@@ -54,14 +53,23 @@ class Decoder(nn.Module):
         out = self.out(ys)
         return out, h
 
-    def reorder_hidden(self, hidden, order):
-        """
-        Reorder hidden along the batch dimension
-        :param hidden:
-        :param order:
-        :return:
-        """
-        if isinstance(hidden, tuple):
-            return tuple(torch.index_select(v, dim=1, index=order) for v in hidden)
+
+class AttentionDecoder(nn.Module):
+    def __init__(self, input_size, hidden_size, output_size, max_encoder_input):
+        super(AttentionDecoder, self).__init__()
+        self.rnn = nn.LSTM(input_size, hidden_size, batch_first=True, dropout=0.5, num_layers=1)
+        self.out_char = nn.Linear(hidden_size, output_size)
+        self.out_attn = nn.Linear(hidden_size, max_encoder_input)
+        self.softmax = nn.Softmax()
+
+    def forward(self, x, h, packed_encoder_output):
+        if isinstance(x, rnn_utils.PackedSequence):
+            y, h = self.rnn(x, h)
+            ys = y.data
+        else:
+            y, h = self.rnn(x.unsqueeze(dim=1), h)
+            ys = y.squeeze(dim=1)
+        out_char = self.out_char(ys)
+        return out_char, h
 
 pass
