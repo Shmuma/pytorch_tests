@@ -70,6 +70,8 @@ class AttentionDecoder(nn.Module):
             y, h = self.rnn(x.unsqueeze(dim=1), h)
             ys = y.squeeze(dim=1)
         out_char = self.out_char(ys)
+        out_attn = self.out_attn(ys)
+        print(out_attn.size())
         return out_char, h
 
 pass
