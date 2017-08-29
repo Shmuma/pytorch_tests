@@ -47,7 +47,7 @@ def test_model(net_encoder, net_decoder, input_vocab, output_vocab, test_data, c
         batch = data[batch_start:batch_end]
 
         input_packed, output_sequences = input.encode_batch(batch, input_vocab, cuda=cuda, volatile=True)
-        hid = net_encoder(input_packed)
+        enc_out, hid = net_encoder(input_packed)
         end_token_idx = output_vocab.token_index[input.END_TOKEN]
         input_token_indices = torch.LongTensor([end_token_idx]).repeat(len(batch), 1)
         max_out_len = max(map(len, output_sequences)) + 1  # extra item for final END_TOKEN
@@ -58,8 +58,7 @@ def test_model(net_encoder, net_decoder, input_vocab, output_vocab, test_data, c
             input_token_indices = input_token_indices.cuda()
 
         dec_hid = None
-        if isinstance(hid, tuple):
-            hid = torch.cat(hid, dim=2).squeeze(dim=0)
+        dec_attn = net_decoder.initial_attention(batch_size=len(batch), cuda=cuda)
 
         for ofs in range(max_out_len):
             input_emb.zero_()
@@ -67,9 +66,9 @@ def test_model(net_encoder, net_decoder, input_vocab, output_vocab, test_data, c
             input_emb_v = Variable(input_emb, volatile=True)
             if cuda:
                 input_emb_v = input_emb_v.cuda()
-            dec_input = torch.cat([input_emb_v, hid], dim=1)
+            dec_input = torch.cat([input_emb_v, dec_attn, hid], dim=1)
 
-            dec_out, dec_hid = net_decoder(dec_input, dec_hid)
+            dec_out, dec_attn, dec_hid = net_decoder(dec_input, dec_hid, enc_out)
             input_token_indices = torch.multinomial(nn_func.softmax(dec_out), num_samples=1).data
             for seq_idx, token in enumerate(input_token_indices):
                 cur_seq = output_sequences[seq_idx]
@@ -127,7 +126,7 @@ if __name__ == "__main__":
 
     # train
     encoder = model.Encoder(input_size=len(input_vocab), hidden_size=HIDDEN_SIZE)
-    decoder = model.AttentionDecoder(input_size=encoder.state_size() + len(output_vocab), hidden_size=HIDDEN_SIZE,
+    decoder = model.AttentionDecoder(input_size=encoder.state_size() + HIDDEN_SIZE + len(output_vocab), hidden_size=HIDDEN_SIZE,
                                      output_size=len(output_vocab), max_encoder_input=INPUT_LIMIT)
     if args.cuda:
         encoder.cuda()
@@ -183,7 +182,7 @@ if __name__ == "__main__":
                 input_emb.scatter_(1, input_token_indices, 1.0)
 
                 # concatenate encoded state with input
-                dec_input = torch.cat([Variable(input_emb), hid], dim=1)
+                dec_input = torch.cat([Variable(input_emb), dec_attn, hid], dim=1)
                 dec_out, dec_attn, dec_hid = decoder(dec_input, dec_hid, enc_out)
                 if trainer_mode:
                     input_token_indices = valid_token_indices_v[ofs].data.unsqueeze(dim=1)
