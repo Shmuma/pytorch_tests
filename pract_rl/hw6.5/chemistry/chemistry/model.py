@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 import torch.nn.utils.rnn as rnn_utils
 from torch.autograd import Variable
 
@@ -59,10 +60,10 @@ class AttentionDecoder(nn.Module):
     def __init__(self, input_size, hidden_size, output_size, max_encoder_input):
         super(AttentionDecoder, self).__init__()
         self.hidden_size = hidden_size
+        self.max_encoder_input = max_encoder_input
         self.rnn = nn.LSTM(input_size, hidden_size, batch_first=True, dropout=0.5, num_layers=1)
         self.out_char = nn.Linear(hidden_size, output_size)
-        self.out_attn = nn.Linear(hidden_size, max_encoder_input)
-        self.softmax = nn.Softmax()
+        self.out_attn = nn.Linear(hidden_size, hidden_size)
 
     def forward(self, x, h, packed_encoder_output):
         if isinstance(x, rnn_utils.PackedSequence):
@@ -71,30 +72,24 @@ class AttentionDecoder(nn.Module):
         else:
             y, h = self.rnn(x.unsqueeze(dim=1), h)
             ys = y.squeeze(dim=1)
+        rnn_hid, rnn_cell = h
+        rnn_hid = rnn_hid.squeeze(dim=0)
         out_char = self.out_char(ys)
-        out_attn_scores = self.out_attn(ys)
-        out_attn_scores = self.softmax(out_attn_scores)
-        out_attn = self._calc_attention(out_attn_scores, packed_encoder_output)
+        out_attn = self._calc_attention(rnn_hid, packed_encoder_output)
         return out_char, out_attn, h
 
-    def _calc_attention(self, scores, packed_encoder_output):
+    def _calc_attention(self, rnn_hidden, packed_encoder_output):
         """
-        Calculate encoder_output tensor with given scores
-        :param scores: tensor of batch * max_encoder_input
+        Calculate attention output based on decoder and encoder hidden states
+        :param rnn_hidden: tensor of batch * hidden_size with hidden state of decoder
         :param packed_encoder_output: PackedSequence with output from encoder. Max len could be less than max_encoder_input
         :return: tensor of batch * hidden_size
         """
+        attn_vals = self.out_attn(rnn_hidden)
         padded_output, encoder_output_lens = rnn_utils.pad_packed_sequence(packed_encoder_output, batch_first=True)
-        # in case it's max_len less than max_encoder_input, we need to pad it more
-        batch_size, max_encoder_input = scores.size()
-        _, encoder_seq_size, hidden_size = padded_output.size()
-        extra_pad_size = max_encoder_input - encoder_seq_size
-        assert extra_pad_size >= 0
-        if extra_pad_size > 0:
-            pad = Variable(torch.zeros(batch_size, extra_pad_size, hidden_size))
-            if padded_output.is_cuda:
-                pad = pad.cuda()
-            padded_output = torch.cat([padded_output, pad], dim=1)
+        scores = torch.bmm(padded_output, attn_vals.unsqueeze(dim=2))
+        scores = scores.squeeze(dim=2)
+        scores = F.softmax(scores)
         scores = scores.unsqueeze(dim=2)
         scores = scores.expand_as(padded_output)
         scaled_output = torch.mul(padded_output, scores)
