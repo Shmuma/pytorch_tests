@@ -174,6 +174,8 @@ if __name__ == "__main__":
             batch_loss = None
             # decoder hidden state
             dec_hid = None
+            # decoder attention state
+            dec_attn = decoder.initial_attention(batch_size=len(batch), cuda=args.cuda)
 
             for ofs in range(max_out_len):
                 # fill input embeddings with one-hot
@@ -182,7 +184,7 @@ if __name__ == "__main__":
 
                 # concatenate encoded state with input
                 dec_input = torch.cat([Variable(input_emb), hid], dim=1)
-                dec_out, dec_hid = decoder(dec_input, dec_hid)
+                dec_out, dec_attn, dec_hid = decoder(dec_input, dec_hid, enc_out)
                 if trainer_mode:
                     input_token_indices = valid_token_indices_v[ofs].data.unsqueeze(dim=1)
                 else:

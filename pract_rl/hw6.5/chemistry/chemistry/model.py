@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.utils.rnn as rnn_utils
+from torch.autograd import Variable
 
 
 class Encoder(nn.Module):
@@ -57,6 +58,7 @@ class Decoder(nn.Module):
 class AttentionDecoder(nn.Module):
     def __init__(self, input_size, hidden_size, output_size, max_encoder_input):
         super(AttentionDecoder, self).__init__()
+        self.hidden_size = hidden_size
         self.rnn = nn.LSTM(input_size, hidden_size, batch_first=True, dropout=0.5, num_layers=1)
         self.out_char = nn.Linear(hidden_size, output_size)
         self.out_attn = nn.Linear(hidden_size, max_encoder_input)
@@ -70,8 +72,39 @@ class AttentionDecoder(nn.Module):
             y, h = self.rnn(x.unsqueeze(dim=1), h)
             ys = y.squeeze(dim=1)
         out_char = self.out_char(ys)
-        out_attn = self.out_attn(ys)
-        print(out_attn.size())
-        return out_char, h
+        out_attn_scores = self.out_attn(ys)
+        out_attn_scores = self.softmax(out_attn_scores)
+        out_attn = self._calc_attention(out_attn_scores, packed_encoder_output)
+        return out_char, out_attn, h
+
+    def _calc_attention(self, scores, packed_encoder_output):
+        """
+        Calculate encoder_output tensor with given scores
+        :param scores: tensor of batch * max_encoder_input
+        :param packed_encoder_output: PackedSequence with output from encoder. Max len could be less than max_encoder_input
+        :return: tensor of batch * hidden_size
+        """
+        padded_output, encoder_output_lens = rnn_utils.pad_packed_sequence(packed_encoder_output, batch_first=True)
+        # in case it's max_len less than max_encoder_input, we need to pad it more
+        batch_size, max_encoder_input = scores.size()
+        _, encoder_seq_size, hidden_size = padded_output.size()
+        extra_pad_size = max_encoder_input - encoder_seq_size
+        assert extra_pad_size >= 0
+        if extra_pad_size > 0:
+            pad = Variable(torch.zeros(batch_size, extra_pad_size, hidden_size))
+            if padded_output.is_cuda:
+                pad = pad.cuda()
+            padded_output = torch.cat([padded_output, pad], dim=1)
+        scores = scores.unsqueeze(dim=2)
+        scores = scores.expand_as(padded_output)
+        scaled_output = torch.mul(padded_output, scores)
+        output = scaled_output.mean(dim=1).squeeze(dim=1)
+        return output
+
+    def initial_attention(self, batch_size, cuda=False):
+        res = Variable(torch.zeros(batch_size, self.hidden_size))
+        if cuda:
+            res = res.cuda()
+        return res
 
 pass
