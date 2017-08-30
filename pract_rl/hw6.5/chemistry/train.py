@@ -38,11 +38,14 @@ DECODER_HEADER_LEN = 100
 log = logging.getLogger("train")
 
 
-def test_model(net_encoder, net_decoder, input_vocab, output_vocab, test_data, cuda=False):
+def test_model(net_encoder, net_decoder, input_vocab, output_vocab, data, cuda=False):
     total_tokens = 0
     valid_tokens = 0
 
-    batch_bounds = input.split_batches(test_data, BATCH_SIZE)
+    batch_bounds = input.split_batches(data, BATCH_SIZE)
+    sample_input = []
+    sample_output_true = []
+    sample_output = []
     for batch_start, batch_end in tqdm(batch_bounds):
         batch = data[batch_start:batch_end]
 
@@ -59,6 +62,11 @@ def test_model(net_encoder, net_decoder, input_vocab, output_vocab, test_data, c
 
         dec_hid = None
         dec_attn = net_decoder.initial_attention(batch_size=len(batch), cuda=cuda)
+        fill_sample = False
+        if not sample_input:
+            fill_sample = True
+            sample_input = list(batch[0][0])
+            sample_output_true = list(batch[0][1])
 
         for ofs in range(max_out_len):
             input_emb.zero_()
@@ -79,6 +87,19 @@ def test_model(net_encoder, net_decoder, input_vocab, output_vocab, test_data, c
                     valid_tokens += int(token[0] == end_token_idx)
                 else:
                     valid_tokens += int(token[0] == output_vocab.token_index[cur_seq[ofs]])
+                    if fill_sample and seq_idx == 0:
+                        sample_output.append(output_vocab.index_token[token[0]])
+    if output_vocab.is_words:
+        sample_input = " ".join(sample_input)
+        sample_output = " ".join(sample_output)
+        sample_output_true = " ".join(sample_output_true)
+    else:
+        sample_input = "".join(sample_input)
+        sample_output = "".join(sample_output)
+        sample_output_true = "".join(sample_output_true)
+    log.info("Sample, true: %s -> %s", sample_input, sample_output_true)
+    log.info("Generated: %s", sample_output)
+
     return valid_tokens / total_tokens
 
 
@@ -89,7 +110,7 @@ if __name__ == "__main__":
     parser.add_argument("--cuda", action='store_true', default=False, help="Enable cuda mode")
     parser.add_argument("--name", required=True, help="Name of directory to save models to")
     parser.add_argument("--tiny", default=False, action='store_true', help="Limit amount of samples to 5000")
-    parser.add_argument("-d", "--data", choices=('orig', 'first_last', 'count'), default='orig',
+    parser.add_argument("-d", "--data", choices=('orig', 'first_last', 'count', 'en_fr'), default='orig',
                         help="Dataset to use, default=orig")
     args = parser.parse_args()
 
@@ -99,16 +120,20 @@ if __name__ == "__main__":
     os.makedirs(save_path, exist_ok=True)
 
     # read dataset
+    words_data = False
     if args.data == "orig":
         data = input.read_data()
+    elif args.data == "en_fr":
+        data = input.read_en_fr()
+        words_data = True
     else:
         data = input.generate_dataset(args.data)
         print(data[:4])
     random.shuffle(data)
     log.info("Have %d samples", len(data))
 
-    input_vocab  = input.Vocabulary(map(lambda p: p[0], data))
-    output_vocab = input.Vocabulary(map(lambda p: p[1], data), extra_items=(input.END_TOKEN, ))
+    input_vocab  = input.Vocabulary(map(lambda p: p[0], data), words=words_data)
+    output_vocab = input.Vocabulary(map(lambda p: p[1], data), extra_items=(input.END_TOKEN, ), words=words_data)
 
     log.info("Input: %s", input_vocab)
     log.info("Output: %s", output_vocab)

@@ -1,10 +1,12 @@
 import random
+import re
 import string
 import pandas as pd
 import numpy as np
 
 import torch
 import torch.nn.utils.rnn as rnn_utils
+import unicodedata
 from torch.autograd import Variable
 
 
@@ -44,6 +46,48 @@ def generate_dataset(dataset_kind, samples_count=10000, input_size=10):
         raise ValueError
 
 
+# Turn a Unicode string to plain ASCII, thanks to http://stackoverflow.com/a/518232/2809427
+def unicode_to_ascii(s):
+    return ''.join(
+        c for c in unicodedata.normalize('NFD', s)
+        if unicodedata.category(c) != 'Mn'
+    )
+
+# Lowercase, trim, and remove non-letter characters
+def normalize_string(s):
+    s = unicode_to_ascii(s.lower().strip())
+    s = re.sub(r"([.!?])", r" \1", s)
+    s = re.sub(r"[^a-zA-Z.!?]+", r" ", s)
+    return s
+
+
+def read_en_fr():
+    good_prefixes = (
+        "i am ", "i m ",
+        "he is", "he s ",
+        "she is", "she s",
+        "you are", "you re "
+    )
+
+    MAX_LEN = 10
+
+    with open("trys/eng-fra.txt", "rt", encoding='utf-8') as fd:
+        res = []
+
+        for l in fd:
+            p1, p2 = l.strip().split('\t')
+            p1 = normalize_string(p1)
+            p2 = normalize_string(p2)
+            if not p1.startswith(good_prefixes):
+                continue
+            s1 = list(p1.split(' '))
+            s2 = list(p2.split(' '))
+            if len(s1) > MAX_LEN or len(s2) > MAX_LEN:
+                continue
+            res.append((s2, s1))
+    return res
+
+
 def split_train_test(data, ratio=0.8):
     train_len = int(len(data) * ratio)
     return data[:train_len], data[train_len:]
@@ -53,9 +97,15 @@ class Vocabulary:
     """
     Vocabulary which used to encode and decode sequences, built dynamically from datas
     """
-    def __init__(self, data, extra_items=()):
-        r = set(list("".join(data)))
+    def __init__(self, data, extra_items=(), words=False):
+        if words:
+            r = set()
+            for item in data:
+                r.update(item)
+        else:
+            r = set(list("".join(data)))
 
+        self.is_words = words
         self.tokens = list(sorted(r))
         self.tokens.extend(extra_items)
         self.token_index = {token: idx for idx, token in enumerate(self.tokens)}
