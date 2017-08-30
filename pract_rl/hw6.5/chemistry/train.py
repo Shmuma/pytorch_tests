@@ -19,8 +19,8 @@ import torch.optim as optim
 from torch.autograd import Variable
 
 
-INPUT_LIMIT = 50
-OUTPUT_LIMIT = 50
+INPUT_LIMIT = 10
+OUTPUT_LIMIT = 10
 
 SEED = 2345  # obtained from fair dice roll, do not change!
 HIDDEN_SIZE = 512
