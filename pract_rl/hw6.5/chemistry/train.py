@@ -29,7 +29,7 @@ GRAD_CLIP = 1.0
 EPOCHES = 10000
 # batch size is in tokens, not in sequences
 BATCH_SIZE = 10000
-TRAINER_RATIO = 0.5
+TRAINER_RATIO = 0.7
 
 DECODER_HEADER_ENABLED = True
 # length of decoder sequence which will be backpropagated to the encoder
