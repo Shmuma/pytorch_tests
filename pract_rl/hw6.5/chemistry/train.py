@@ -168,7 +168,8 @@ if __name__ == "__main__":
         losses = []
 
         ts = time.time()
-        random.shuffle(data)
+        random.shuffle(train_data)
+        random.shuffle(test_data)
         batch_bounds = input.split_batches(train_data, BATCH_SIZE, max_sequences=16)
         for batch_start, batch_end in tqdm(batch_bounds):
             batch = data[batch_start:batch_end]
