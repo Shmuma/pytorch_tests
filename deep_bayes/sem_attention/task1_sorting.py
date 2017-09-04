@@ -5,7 +5,8 @@ Implementation of sorting network with attention.
 Original tutorial is on lasagna:
 https://github.com/bayesgroup/deepbayes2017/blob/master/sem3-attention/Attention_seminar%20(Start%20here).ipynb
 """
-from tqdm import tnrange
+import argparse
+from tqdm import tqdm
 import itertools
 import numpy as np
 
@@ -98,6 +99,10 @@ def initial_query(batch_size, hidden_size):
 
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--cuda", default=False, action='store_true', help="Enable cuda calculation")
+    args = parser.parse_args()
+
     # input is original encoder seq plus result of attention, each of them is CODE_SIZE*2
     rnn = nn.RNN(input_size=CODE_SIZE*2*2, hidden_size=DECODER_HIDDEN, batch_first=True)
     output_layer = nn.Linear(in_features=DECODER_HIDDEN, out_features=CODE_SIZE*2)
@@ -106,10 +111,14 @@ if __name__ == "__main__":
     optimizer = optim.Adam(params=itertools.chain(rnn.parameters(), output_layer.parameters(),
                                                   attention_weights.parameters()),
                            lr=0.01)
+    if args.cuda:
+        rnn.cuda()
+        output_layer.cuda()
+        attention_weights.cuda()
     objective = nn.BCELoss()
     min_loss = None
 
-    for i in tnrange(10000):
+    for i in tqdm(range(10000)):
         optimizer.zero_grad()
         batch_input, batch_target = generate_sample()
         # batch of size 1
@@ -122,6 +131,12 @@ if __name__ == "__main__":
         query_v = initial_query(batch_size=1, hidden_size=DECODER_HIDDEN)
 
         total_loss = Variable(torch.FloatTensor([0.0]))
+
+        if args.cuda:
+            batch_input_v = batch_input_v.cuda()
+            batch_target_v = batch_target_v.cuda()
+            query_v = query_v.cuda()
+            total_loss = total_loss.cuda()
 
         # iterate over our batch sequence
         for ofs in range(batch_input_v.size()[1]-1):
