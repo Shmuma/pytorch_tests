@@ -105,12 +105,9 @@ if __name__ == "__main__":
 
     # input is original encoder seq plus result of attention, each of them is CODE_SIZE*2
     rnn = nn.RNN(input_size=CODE_SIZE*2*2, hidden_size=DECODER_HIDDEN, batch_first=True)
-    output_layer = nn.Linear(in_features=DECODER_HIDDEN, out_features=CODE_SIZE*2)
     attention_weights = AttentionWeights(size_enc_hidden=CODE_SIZE*2, size_dec_hidden=DECODER_HIDDEN,
                                          size_att_hidden=ATTENTION_HIDDEN)
-    optimizer = optim.Adam(params=itertools.chain(rnn.parameters(), output_layer.parameters(),
-                                                  attention_weights.parameters()),
-                           lr=0.01)
+    optimizer = optim.Adam(params=itertools.chain(rnn.parameters(), attention_weights.parameters()), lr=0.01)
     if args.cuda:
         rnn.cuda()
         output_layer.cuda()
@@ -146,13 +143,10 @@ if __name__ == "__main__":
             desired_output = batch_target_v[:, ofs+1]
             # build rnn input and create time dimension
             rnn_in = torch.cat([encoder_input, att_outputs], dim=1).unsqueeze(dim=1)
-            rnn_out, rnn_hid = rnn(rnn_in, query_v.unsqueeze(dim=0))
+            _, rnn_hid = rnn(rnn_in, query_v.unsqueeze(dim=0))
             # first dim in rnn hidden is num_layers*num_directions, so, squeeze it
             query_v = rnn_hid.squeeze(dim=0)
-            # squeeze time of output
-            rnn_out = rnn_out.squeeze(dim=1)
-            output = F.sigmoid(output_layer(rnn_out))
-            loss = objective(output, desired_output)
+            loss = objective(att_outputs, desired_output)
             total_loss += loss
         total_loss /= batch_input_v.size()[1]
         total_loss.backward()
