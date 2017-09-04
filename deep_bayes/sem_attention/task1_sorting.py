@@ -136,11 +136,11 @@ if __name__ == "__main__":
             total_loss = total_loss.cuda()
 
         # iterate over our batch sequence
-        for ofs in range(batch_input_v.size()[1]-1):
+        for ofs in range(batch_input_v.size()[1]):
             att_weights = attention_weights(batch_input_v, query_v)
             att_outputs = attention_outputs(batch_input_v, att_weights)
             encoder_input = batch_input_v[:, ofs]
-            desired_output = batch_target_v[:, ofs+1]
+            desired_output = batch_target_v[:, ofs]
             # build rnn input and create time dimension
             rnn_in = torch.cat([encoder_input, att_outputs], dim=1).unsqueeze(dim=1)
             _, rnn_hid = rnn(rnn_in, query_v.unsqueeze(dim=0))
