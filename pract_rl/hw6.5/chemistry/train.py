@@ -24,6 +24,7 @@ OUTPUT_LIMIT = 10
 
 SEED = 2345  # obtained from fair dice roll, do not change!
 HIDDEN_SIZE = 512
+ATTENTION_SIZE = 128
 
 GRAD_CLIP = 1.0
 EPOCHES = 10000
@@ -152,7 +153,7 @@ if __name__ == "__main__":
     # train
     encoder = model.Encoder(input_size=len(input_vocab), hidden_size=HIDDEN_SIZE)
     decoder = model.AttentionDecoder(input_size=encoder.state_size() + HIDDEN_SIZE + len(output_vocab), hidden_size=HIDDEN_SIZE,
-                                     output_size=len(output_vocab), max_encoder_input=INPUT_LIMIT)
+                                     output_size=len(output_vocab), max_encoder_input=INPUT_LIMIT, attention_size=ATTENTION_SIZE)
     if args.cuda:
         encoder.cuda()
         decoder.cuda()

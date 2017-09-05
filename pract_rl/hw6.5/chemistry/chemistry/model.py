@@ -57,13 +57,16 @@ class Decoder(nn.Module):
 
 
 class AttentionDecoder(nn.Module):
-    def __init__(self, input_size, hidden_size, output_size, max_encoder_input):
+    def __init__(self, input_size, hidden_size, output_size, max_encoder_input, attention_size):
         super(AttentionDecoder, self).__init__()
         self.hidden_size = hidden_size
         self.max_encoder_input = max_encoder_input
         self.rnn = nn.LSTM(input_size, hidden_size, batch_first=True, dropout=0.5, num_layers=1)
         self.out_char = nn.Linear(hidden_size, output_size)
-        self.out_attn = nn.Linear(hidden_size, hidden_size)
+#        self.out_attn = nn.Linear(hidden_size, hidden_size)
+        self.w_enc = nn.Linear(hidden_size, attention_size, bias=False)
+        self.w_query = nn.Linear(hidden_size, attention_size, bias=False)
+        self.w_out = nn.Linear(attention_size, 1, bias=False)
 
     def forward(self, x, h, packed_encoder_output):
         if isinstance(x, rnn_utils.PackedSequence):
@@ -85,16 +88,31 @@ class AttentionDecoder(nn.Module):
         :param packed_encoder_output: PackedSequence with output from encoder. Max len could be less than max_encoder_input
         :return: tensor of batch * hidden_size
         """
-        attn_vals = self.out_attn(rnn_hidden)
+        query_part = self.w_query(rnn_hidden)
         padded_output, encoder_output_lens = rnn_utils.pad_packed_sequence(packed_encoder_output, batch_first=True)
-        scores = torch.bmm(padded_output, attn_vals.unsqueeze(dim=2))
-        scores = scores.squeeze(dim=2)
-        scores = F.softmax(scores)
-        scores = scores.unsqueeze(dim=2)
-        scores = scores.expand_as(padded_output)
-        scaled_output = torch.mul(padded_output, scores)
-        output = scaled_output.mean(dim=1).squeeze(dim=1)
+        print(padded_output.size())
+        enc_part = self.w_enc(padded_output)
+        print(rnn_hidden.size())
+        print(enc_part.size())
+        print(query_part.size())
+        print(packed_encoder_output)
+        part = enc_part + query_part
+        part = F.tanh(part)
+        logits = self.w_out(part).squeeze(dim=2)
+        weight = F.softmax(logits)
+        output = torch.bmm(packed_encoder_output.data, weight)
         return output
+        #
+        # attn_vals = self.out_attn(rnn_hidden)
+        # padded_output, encoder_output_lens = rnn_utils.pad_packed_sequence(packed_encoder_output, batch_first=True)
+        # scores = torch.bmm(padded_output, attn_vals.unsqueeze(dim=2))
+        # scores = scores.squeeze(dim=2)
+        # scores = F.softmax(scores)
+        # scores = scores.unsqueeze(dim=2)
+        # scores = scores.expand_as(padded_output)
+        # scaled_output = torch.mul(padded_output, scores)
+        # output = scaled_output.mean(dim=1).squeeze(dim=1)
+        # return output
 
     def initial_attention(self, batch_size, cuda=False):
         res = Variable(torch.zeros(batch_size, self.hidden_size))
