@@ -88,19 +88,15 @@ class AttentionDecoder(nn.Module):
         :param packed_encoder_output: PackedSequence with output from encoder. Max len could be less than max_encoder_input
         :return: tensor of batch * hidden_size
         """
-        query_part = self.w_query(rnn_hidden)
+        query_part = self.w_query(rnn_hidden).unsqueeze(dim=1)
         padded_output, encoder_output_lens = rnn_utils.pad_packed_sequence(packed_encoder_output, batch_first=True)
-        print(padded_output.size())
         enc_part = self.w_enc(padded_output)
-        print(rnn_hidden.size())
-        print(enc_part.size())
-        print(query_part.size())
-        print(packed_encoder_output)
         part = enc_part + query_part
         part = F.tanh(part)
         logits = self.w_out(part).squeeze(dim=2)
-        weight = F.softmax(logits)
-        output = torch.bmm(packed_encoder_output.data, weight)
+        weight = F.softmax(logits).unsqueeze(dim=2)
+
+        output = torch.bmm(padded_output.transpose(1, 2), weight).squeeze(dim=2)
         return output
         #
         # attn_vals = self.out_attn(rnn_hidden)

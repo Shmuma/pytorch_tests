@@ -75,6 +75,7 @@ class AttentionWeights(nn.Module):
         :return: tensor of size batch*time with attention weights
         """
         query_part = self.w_query(query)
+        # this will work only in pytorch 0.2
         enc_part = self.w_enc(encoder_sequence)
         # here we do broadcast of query by time (dim=1)
         part = enc_part + query_part
