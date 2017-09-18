@@ -1,4 +1,9 @@
+#!/usr/bin/env python3
 import gym
+import ptan
+
+import torch.nn as nn
+
 
 from rockpaperscissors import RockPaperScissors
 
@@ -12,7 +17,12 @@ if __name__ == "__main__":
     env = make_env()
     observation_shape = env.observation_space.shape
     n_actions = env.action_space.n
-    env.reset()
-    obs = env.step(env.action_space.sample())[0]
-    print(observation_shape, n_actions, obs)
+
+    model = nn.Sequential(nn.Linear(observation_shape[0], 32),
+                          nn.ELU(),
+                          nn.Linear(32, n_actions),
+                          nn.Softmax())
+
+    agent = ptan.agent.PolicyAgent(model)
+
     pass
