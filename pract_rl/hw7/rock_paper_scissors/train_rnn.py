@@ -39,7 +39,6 @@ class Model(nn.Module):
         self.rnn = nn.RNN(input_size, hidden_size, batch_first=True)
         self.nonlin = nn.ELU()
         self.out = nn.Linear(hidden_size, actions)
-        self.sm = nn.Softmax()
 
     def forward(self, x, h=None):
         out, _ = self.forward_hidden(x, h)
@@ -53,7 +52,6 @@ class Model(nn.Module):
         out = self.out(out)
         # remove time dimension back
         out = out.squeeze(dim=1)
-        out = self.sm(out)
         return out, rnn_hid
 
     def forward_multistep(self, x, h=None):
@@ -63,30 +61,22 @@ class Model(nn.Module):
         rnn_out, _ = self.rnn(x, h)
         out = self.nonlin(rnn_out)
         out = self.out(out)
-        # reshape tensor to be able to apply softmax
-        old_shape = out.size()
-        out = out.view(-1, old_shape[-1])
-        out = self.sm(out)
-        # reshape back
-        out = out.view(old_shape)
         return out
 
 
 def play_episode(env, model):
     obs = env.reset()
     total_reward = 0.0
-    entropy = []
     hidden = None
     while True:
-        probs, hidden = model.forward_hidden(Variable(torch.from_numpy(np.array([obs], dtype=np.float32))), h=hidden)
-        probs = probs.data.cpu().numpy()[0]
-        entropy.append(-np.sum(np.multiply(probs, np.log(probs))))
-        action = np.random.choice(len(probs), p=probs)
+        qvals, hidden = model.forward_hidden(Variable(torch.from_numpy(np.array([obs], dtype=np.float32))), h=hidden)
+        qvals = qvals.data.cpu().numpy()[0]
+        action = np.argmax(qvals)
         obs, reward, is_done, _ = env.step(action)
         total_reward += reward
         if is_done:
             break
-    return total_reward, np.mean(entropy)
+    return total_reward
 
 
 if __name__ == "__main__":
@@ -98,7 +88,8 @@ if __name__ == "__main__":
 
     model = Model(observation_shape[0], RNN_HIDDEN, n_actions)
 
-    agent = ptan.agent.PolicyAgent(model)
+    action_selector = ptan.actions.epsilon_greedy.ActionSelectorEpsilonGreedy(epsilon=0.05, params=params)
+    agent = ptan.agent.DQNAgent(model, action_selector=action_selector)
     exp_source = ptan.experience.ExperienceSource(env=[make_env() for _ in range(POOL_SIZE)], agent=agent, steps_count=2*EXP_STEPS_COUNT)
     exp_buffer = ptan.experience.ExperienceReplayBuffer(exp_source, buffer_size=EXP_BUFFER_SIZE)
 
@@ -130,8 +121,8 @@ if __name__ == "__main__":
 
                 if idx < EXP_STEPS_COUNT:
                     break
-                prob = out[batch_idx, idx, exp.action]
-                result += -prob.log() * R
+                qval = out[batch_idx, idx, exp.action]
+                result += (qval - R) ** 2
                 count += 1
         return result / count
 
@@ -152,10 +143,9 @@ if __name__ == "__main__":
         writer.add_scalar(RUN_PREFIX + "/loss", np.mean(losses), iter)
         if iter % TEST_EVERY_ITER == 0:
             test_env = make_env()
-            rewards, entropies = zip(*[play_episode(test_env, model) for _ in range(TEST_RUNS)])
-            print("Test run: %.2f mean reward, %.5f entropy" % (np.mean(rewards), np.mean(entropies)))
+            rewards = [play_episode(test_env, model) for _ in range(TEST_RUNS)]
+            print("Test run: %.2f mean reward" % np.mean(rewards))
             writer.add_scalar(RUN_PREFIX + "/reward_test", np.mean(rewards), iter)
-            writer.add_scalar(RUN_PREFIX + "/entropy_test", np.mean(entropies), iter)
 
 
     writer.close()
