@@ -90,13 +90,14 @@ if __name__ == "__main__":
 
     action_selector = ptan.actions.epsilon_greedy.ActionSelectorEpsilonGreedy(epsilon=0.05, params=params)
     agent = ptan.agent.DQNAgent(model, action_selector=action_selector)
-    exp_source = ptan.experience.ExperienceSource(env=[make_env() for _ in range(POOL_SIZE)], agent=agent, steps_count=2*EXP_STEPS_COUNT)
+    exp_source = ptan.experience.ExperienceSource(env=[make_env() for _ in range(POOL_SIZE)],
+                                                  agent=agent, steps_count=EXP_STEPS_COUNT)
     exp_buffer = ptan.experience.ExperienceReplayBuffer(exp_source, buffer_size=EXP_BUFFER_SIZE)
 
     optimizer = optim.Adam(model.parameters(), lr=0.0001)
     writer = SummaryWriter()
 
-    def calc_loss(batch):
+    def calc_loss(batch, warm_up_steps=5, sarsa_n=2):
         """
         Calculate loss variable from batch
         """
@@ -112,16 +113,15 @@ if __name__ == "__main__":
         result = Variable(torch.FloatTensor(1).zero_())
         count = 0
         for batch_idx, exps in enumerate(batch):
-            if len(exps) < EXP_STEPS_COUNT:
+            if len(exps) < warm_up_steps:
                 continue
-            R = 0.0
-            for idx, exp in reversed(list(enumerate(exps))):
-                R *= GAMMA
-                R += exp.reward
+            for idx in range(warm_up_steps, len(exps)-sarsa_n):
+                R = 0.0
+                for ofs in range(sarsa_n):
+                    R *= GAMMA
+                    R += exps[idx+ofs].reward
 
-                if idx < EXP_STEPS_COUNT:
-                    break
-                qval = out[batch_idx, idx, exp.action]
+                qval = out[batch_idx, idx, exps[idx].action]
                 result += (qval - R) ** 2
                 count += 1
         return result / count

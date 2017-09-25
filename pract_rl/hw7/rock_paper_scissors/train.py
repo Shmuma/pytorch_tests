@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 import gym
 import ptan
-import random
 import numpy as np
 
 import torch
