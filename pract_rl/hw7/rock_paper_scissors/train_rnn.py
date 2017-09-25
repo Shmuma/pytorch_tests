@@ -8,6 +8,8 @@ import torch.nn as nn
 import torch.optim as optim
 from torch.autograd import Variable
 
+from tensorboardX import SummaryWriter
+
 from rockpaperscissors import RockPaperScissors
 
 RNN_HIDDEN = 32
@@ -17,6 +19,11 @@ BATCH_SIZE = 16
 EXP_STEPS_COUNT = 10
 EXP_BUFFER_SIZE = 100
 EXP_BUFFER_POPULATE = 16
+
+TEST_EVERY_ITER = 10
+TEST_RUNS = 10
+
+RUN_PREFIX = "runs/rnn"
 
 
 def make_env():
@@ -33,15 +40,19 @@ class Model(nn.Module):
         self.sm = nn.Softmax()
 
     def forward(self, x, h=None):
+        out, _ = self.forward_hidden(x, h)
+        return out
+
+    def forward_hidden(self, x, h):
         # add an extra time dimension
         x = x.unsqueeze(dim=1)
-        rnn_out, _ = self.rnn(x, h)
+        rnn_out, rnn_hid = self.rnn(x, h)
         out = self.nonlin(rnn_out)
         out = self.out(out)
         # remove time dimension back
         out = out.squeeze(dim=1)
         out = self.sm(out)
-        return out
+        return out, rnn_hid
 
     def forward_multistep(self, x, h=None):
         """
@@ -59,6 +70,23 @@ class Model(nn.Module):
         return out
 
 
+def play_episode(env, model):
+    obs = env.reset()
+    total_reward = 0.0
+    entropy = []
+    hidden = None
+    while True:
+        probs, hidden = model.forward_hidden(Variable(torch.from_numpy(np.array([obs], dtype=np.float32))), h=hidden)
+        probs = probs.data.cpu().numpy()[0]
+        entropy.append(-np.sum(np.multiply(probs, np.log(probs))))
+        action = np.random.choice(len(probs), p=probs)
+        obs, reward, is_done, _ = env.step(action)
+        total_reward += reward
+        if is_done:
+            break
+    return total_reward, np.mean(entropy)
+
+
 if __name__ == "__main__":
     env = make_env()
     params = ptan.common.env_params.EnvParams.from_env(env)
@@ -72,7 +100,8 @@ if __name__ == "__main__":
     exp_source = ptan.experience.ExperienceSource(env=env, agent=agent, steps_count=2*EXP_STEPS_COUNT)
     exp_buffer = ptan.experience.ExperienceReplayBuffer(exp_source, buffer_size=EXP_BUFFER_SIZE)
 
-    optimizer = optim.Adam(model.parameters(), lr=0.001)
+    optimizer = optim.Adam(model.parameters(), lr=0.0001)
+    writer = SummaryWriter()
 
     def calc_loss(batch):
         """
@@ -114,8 +143,19 @@ if __name__ == "__main__":
             optimizer.step()
             losses.append(loss.data.cpu().numpy()[0])
         total_rewards = exp_source.pop_total_rewards()
-        mean_reward = np.mean(total_rewards) if total_rewards else 0.0
+        if total_rewards:
+            mean_reward = np.mean(total_rewards) if total_rewards else 0.0
+            print("%d: mean reward %.3f in %d games, loss %.3f" % (iter, mean_reward, len(total_rewards), np.mean(losses)))
+            writer.add_scalar(RUN_PREFIX + "/total_rewards", mean_reward, iter)
+        writer.add_scalar(RUN_PREFIX + "/loss", np.mean(losses), iter)
+        if iter % TEST_EVERY_ITER == 0:
+            test_env = make_env()
+            rewards, entropies = zip(*[play_episode(test_env, model) for _ in range(TEST_RUNS)])
+            print("Test run: %.2f mean reward, %.5f entropy" % (np.mean(rewards), np.mean(entropies)))
+            writer.add_scalar(RUN_PREFIX + "/reward_test", np.mean(rewards), iter)
+            writer.add_scalar(RUN_PREFIX + "/entropy_test", np.mean(entropies), iter)
 
-        print("%d: mean reward %.3f in %d games, loss %.3f" % (iter, mean_reward, len(total_rewards), np.mean(losses)))
+
+    writer.close()
 
     pass
