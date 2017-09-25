@@ -16,7 +16,8 @@ RNN_HIDDEN = 32
 
 GAMMA = 0.99
 BATCH_SIZE = 16
-EXP_STEPS_COUNT = 10
+POOL_SIZE = 4
+EXP_STEPS_COUNT = 20
 EXP_BUFFER_SIZE = 100
 EXP_BUFFER_POPULATE = 16
 
@@ -98,7 +99,7 @@ if __name__ == "__main__":
     model = Model(observation_shape[0], RNN_HIDDEN, n_actions)
 
     agent = ptan.agent.PolicyAgent(model)
-    exp_source = ptan.experience.ExperienceSource(env=env, agent=agent, steps_count=2*EXP_STEPS_COUNT)
+    exp_source = ptan.experience.ExperienceSource(env=[make_env() for _ in range(POOL_SIZE)], agent=agent, steps_count=2*EXP_STEPS_COUNT)
     exp_buffer = ptan.experience.ExperienceReplayBuffer(exp_source, buffer_size=EXP_BUFFER_SIZE)
 
     optimizer = optim.Adam(model.parameters(), lr=0.0001)
