@@ -20,6 +20,7 @@ EXP_STEPS_COUNT = 10
 EXP_BUFFER_SIZE = 100
 EXP_BUFFER_POPULATE = 16
 
+ITERATIONS = 10000
 TEST_EVERY_ITER = 10
 TEST_RUNS = 10
 
@@ -133,7 +134,7 @@ if __name__ == "__main__":
                 count += 1
         return result / count
 
-    for iter in range(1000):
+    for iter in range(ITERATIONS):
         losses = []
         exp_buffer.populate(EXP_BUFFER_POPULATE)
         for batch in exp_buffer.batches(BATCH_SIZE):
