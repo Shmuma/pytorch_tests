@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+import random
 import argparse
 import cv2
 
@@ -6,6 +7,7 @@ import torch
 import torch.nn as nn
 from torch.autograd import Variable
 import torch.optim as optim
+from tensorboardX import SummaryWriter
 
 import torchvision.utils as vutils
 
@@ -24,8 +26,11 @@ BATCH_SIZE = 32
 # dimension input image will be rescaled
 IMAGE_SIZE = 64
 
-LEARNING_RATE = 0.001
-REPORT_EVERY_ITER = 10
+LEARNING_RATE = 0.0001
+REPORT_EVERY_ITER = 100
+SAVE_IMAGE_EVERY_ITER = 1000
+
+RUN_PREFIX = "runs"
 
 
 class InputWrapper(gym.ObservationWrapper):
@@ -108,17 +113,19 @@ class Generator(nn.Module):
         return self.pipe(x)
 
 
-def iterate_batches(env, batch_size=BATCH_SIZE):
-    batch = [env.reset()]
+def iterate_batches(envs, batch_size=BATCH_SIZE):
+    batch = [e.reset() for e in envs]
+    env_gen = iter(lambda: random.choice(envs), None)
 
     while True:
-        obs, reward, is_done, _ = env.step(env.action_space.sample())
+        e = next(env_gen)
+        obs, reward, is_done, _ = e.step(e.action_space.sample())
         batch.append(obs)
         if len(batch) == batch_size:
             yield Variable(torch.from_numpy(np.array(batch, dtype=np.float32)))
-            batch = []
+            batch.clear()
         if is_done:
-            batch.append(env.reset())
+            e.reset()
 
 
 if __name__ == "__main__":
@@ -126,8 +133,8 @@ if __name__ == "__main__":
     parser.add_argument("--cuda", default=False, action='store_true', help="Enable cuda computation")
     args = parser.parse_args()
 
-    env = InputWrapper(gym.make("Breakout-v0"))
-    input_shape = env.observation_space.shape
+    envs = [InputWrapper(gym.make(name)) for name in ('Breakout-v0', 'AirRaid-v0', 'Pong-v0')]
+    input_shape = envs[0].observation_space.shape
     log.info("Observations: %s", input_shape)
 
     net_discr = Discriminator(input_shape=input_shape)
@@ -142,6 +149,7 @@ if __name__ == "__main__":
     objective = nn.BCELoss()
     gen_optimizer = optim.Adam(params=net_gener.parameters(), lr=LEARNING_RATE)
     dis_optimizer = optim.Adam(params=net_discr.parameters(), lr=LEARNING_RATE)
+    writer = SummaryWriter()
 
     gen_losses = []
     dis_losses = []
@@ -153,7 +161,7 @@ if __name__ == "__main__":
         true_labels_v = true_labels_v.cuda()
         fake_labels_v = fake_labels_v.cuda()
 
-    for batch in iterate_batches(env):
+    for batch in iterate_batches(envs):
         dis_optimizer.zero_grad()
 
         # generate extra fake samples, input is 4D: batch, filters, x, y
@@ -174,10 +182,7 @@ if __name__ == "__main__":
         # train generator
         gen_optimizer.zero_grad()
         dis_output_v = net_discr(gen_output_v)
-        gen_labels_v = Variable(torch.FloatTensor([1.0] * BATCH_SIZE))
-        if args.cuda:
-            gen_labels_v = gen_labels_v.cuda()
-        gen_loss = objective(dis_output_v, gen_labels_v)
+        gen_loss = objective(dis_output_v, true_labels_v)
         gen_loss.backward()
         gen_optimizer.step()
         gen_losses.append(gen_loss.data.cpu().numpy()[0])
@@ -185,9 +190,12 @@ if __name__ == "__main__":
         iter_no += 1
         if iter_no % REPORT_EVERY_ITER == 0:
             log.info("Iter %d: gen_loss=%.3e, dis_loss=%.3e", iter_no, np.mean(gen_losses), np.mean(dis_losses))
+            writer.add_scalar(RUN_PREFIX + "/gen_loss", np.mean(gen_losses), iter_no)
+            writer.add_scalar(RUN_PREFIX + "/dis_loss", np.mean(dis_losses), iter_no)
             gen_losses = []
             dis_losses = []
-            vutils.save_image(gen_output_v.data[0], "out-%03d.png" % iter_no, nrow=8, normalize=False)
+        if iter_no % SAVE_IMAGE_EVERY_ITER == 0:
+            vutils.save_image(gen_output_v.data, "out-%03d.png" % iter_no, nrow=8, normalize=False)
 
     pass
 
