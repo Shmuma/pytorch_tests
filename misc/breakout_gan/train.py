@@ -5,6 +5,7 @@ import cv2
 import torch
 import torch.nn as nn
 from torch.autograd import Variable
+import torch.optim as optim
 
 import torchvision.utils as vutils
 
@@ -22,6 +23,10 @@ BATCH_SIZE = 32
 
 # dimension input image will be rescaled
 IMAGE_SIZE = 64
+
+LEARNING_RATE = 0.001
+REPORT_EVERY_ITER = 10
+
 
 class InputWrapper(gym.ObservationWrapper):
     """
@@ -64,7 +69,8 @@ class Discriminator(nn.Module):
             nn.BatchNorm2d(DISCR_FILTERS * 8),
             nn.ReLU(),
             nn.Conv2d(in_channels=DISCR_FILTERS * 8, out_channels=1,
-                      kernel_size=4, stride=1, padding=0)
+                      kernel_size=4, stride=1, padding=0),
+            nn.Sigmoid()
         )
 
     def forward(self, x):
@@ -116,6 +122,10 @@ def iterate_batches(env, batch_size=BATCH_SIZE):
 
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--cuda", default=False, action='store_true', help="Enable cuda computation")
+    args = parser.parse_args()
+
     env = InputWrapper(gym.make("Breakout-v0"))
     input_shape = env.observation_space.shape
     log.info("Observations: %s", input_shape)
@@ -125,17 +135,59 @@ if __name__ == "__main__":
     log.info("Discriminator: %s", net_discr)
     log.info("Generator: %s", net_gener)
 
+    if args.cuda:
+        net_discr.cuda()
+        net_gener.cuda()
+
+    objective = nn.BCELoss()
+    gen_optimizer = optim.Adam(params=net_gener.parameters(), lr=LEARNING_RATE)
+    dis_optimizer = optim.Adam(params=net_discr.parameters(), lr=LEARNING_RATE)
+
+    gen_losses = []
+    dis_losses = []
+    iter_no = 0
+
+    true_labels_v = Variable(torch.FloatTensor([1.0] * BATCH_SIZE))
+    fake_labels_v = Variable(torch.FloatTensor([0.0] * BATCH_SIZE))
+    if args.cuda:
+        true_labels_v = true_labels_v.cuda()
+        fake_labels_v = fake_labels_v.cuda()
+
     for batch in iterate_batches(env):
-        out = net_discr(batch)
-        print(out.size())
-        vutils.save_image(batch.data, "out.png", nrow=8, normalize=True)
+        dis_optimizer.zero_grad()
 
-        input_v = Variable(torch.FloatTensor(1, LATENT_VECTOR_SIZE, 1, 1).normal_(0, 1))
-        out = net_gener(input_v)
-        print(out.size())
+        # generate extra fake samples, input is 4D: batch, filters, x, y
+        gen_input_v = Variable(torch.FloatTensor(BATCH_SIZE, LATENT_VECTOR_SIZE, 1, 1).normal_(0, 1))
+        if args.cuda:
+            batch = batch.cuda()
+            gen_input_v = gen_input_v.cuda()
+        gen_output_v = net_gener(gen_input_v)
 
-#        vutils.save_image(out.data[0], "out.png", normalize=False)
-        break
+        # train discriminator
+        dis_output_true_v = net_discr(batch)
+        dis_output_fake_v = net_discr(gen_output_v.detach())
+        dis_loss = objective(dis_output_true_v, true_labels_v) + objective(dis_output_fake_v, fake_labels_v)
+        dis_loss.backward()
+        dis_optimizer.step()
+        dis_losses.append(dis_loss.data.cpu().numpy()[0])
+
+        # train generator
+        gen_optimizer.zero_grad()
+        dis_output_v = net_discr(gen_output_v)
+        gen_labels_v = Variable(torch.FloatTensor([1.0] * BATCH_SIZE))
+        if args.cuda:
+            gen_labels_v = gen_labels_v.cuda()
+        gen_loss = objective(dis_output_v, gen_labels_v)
+        gen_loss.backward()
+        gen_optimizer.step()
+        gen_losses.append(gen_loss.data.cpu().numpy()[0])
+
+        iter_no += 1
+        if iter_no % REPORT_EVERY_ITER == 0:
+            log.info("Iter %d: gen_loss=%.3e, dis_loss=%.3e", iter_no, np.mean(gen_losses), np.mean(dis_losses))
+            gen_losses = []
+            dis_losses = []
+            vutils.save_image(gen_output_v.data[0], "out-%03d.png" % iter_no, nrow=8, normalize=False)
 
     pass
 
