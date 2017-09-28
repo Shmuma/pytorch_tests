@@ -21,7 +21,7 @@ log = gym.logger
 LATENT_VECTOR_SIZE = 100
 DISCR_FILTERS = 64
 GENER_FILTERS = 64
-BATCH_SIZE = 32
+BATCH_SIZE = 256
 
 # dimension input image will be rescaled
 IMAGE_SIZE = 64
@@ -147,8 +147,8 @@ if __name__ == "__main__":
         net_gener.cuda()
 
     objective = nn.BCELoss()
-    gen_optimizer = optim.Adam(params=net_gener.parameters(), lr=LEARNING_RATE)
-    dis_optimizer = optim.Adam(params=net_discr.parameters(), lr=LEARNING_RATE)
+    gen_optimizer = optim.Adam(params=net_gener.parameters(), lr=LEARNING_RATE, betas=(0.5, 0.999))
+    dis_optimizer = optim.Adam(params=net_discr.parameters(), lr=LEARNING_RATE, betas=(0.5, 0.999))
     writer = SummaryWriter()
 
     gen_losses = []
@@ -176,7 +176,7 @@ if __name__ == "__main__":
         dis_output_fake_v = net_discr(gen_output_v.detach())
         dis_loss = objective(dis_output_true_v, true_labels_v) + objective(dis_output_fake_v, fake_labels_v)
         dis_loss.backward()
-        nn.utils.clip_grad_norm(net_discr.parameters(), max_norm=1.0)
+        # nn.utils.clip_grad_norm(net_discr.parameters(), max_norm=1.0)
         dis_optimizer.step()
         dis_losses.append(dis_loss.data.cpu().numpy()[0])
 
@@ -185,7 +185,7 @@ if __name__ == "__main__":
         dis_output_v = net_discr(gen_output_v)
         gen_loss = objective(dis_output_v, true_labels_v)
         gen_loss.backward()
-        nn.utils.clip_grad_norm(net_gener.parameters(), max_norm=1.0)
+        # nn.utils.clip_grad_norm(net_gener.parameters(), max_norm=1.0)
         gen_optimizer.step()
         gen_losses.append(gen_loss.data.cpu().numpy()[0])
 
