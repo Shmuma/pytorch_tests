@@ -176,6 +176,7 @@ if __name__ == "__main__":
         dis_output_fake_v = net_discr(gen_output_v.detach())
         dis_loss = objective(dis_output_true_v, true_labels_v) + objective(dis_output_fake_v, fake_labels_v)
         dis_loss.backward()
+        nn.utils.clip_grad_norm(net_discr.parameters(), max_norm=1.0)
         dis_optimizer.step()
         dis_losses.append(dis_loss.data.cpu().numpy()[0])
 
@@ -184,6 +185,7 @@ if __name__ == "__main__":
         dis_output_v = net_discr(gen_output_v)
         gen_loss = objective(dis_output_v, true_labels_v)
         gen_loss.backward()
+        nn.utils.clip_grad_norm(net_gener.parameters(), max_norm=1.0)
         gen_optimizer.step()
         gen_losses.append(gen_loss.data.cpu().numpy()[0])
 
