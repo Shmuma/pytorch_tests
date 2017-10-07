@@ -241,7 +241,8 @@ if __name__ == "__main__":
         policy_net.cuda()
 
     agent = StatefulAgent(state_net, policy_net, cuda=CUDA)
-    exp_source = ptan.experience.ExperienceSource([make_env() for _ in range(GAMES_COUNT)], agent, steps_count=EXPERIENCE_LEN)
+    exp_source = ptan.experience.ExperienceSource([make_env() for _ in range(GAMES_COUNT)],
+                                                  agent, steps_count=EXPERIENCE_LEN, steps_delta=5)
     stats_dict = collections.Counter()
 
     for idx, exp in enumerate(exp_source):
