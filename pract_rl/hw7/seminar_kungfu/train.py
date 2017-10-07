@@ -15,7 +15,7 @@ from tensorboardX import SummaryWriter
 
 log = gym.logger
 
-GAMES_COUNT = 5
+GAMES_COUNT = 10
 LSTM_SIZE = 512
 LEARNING_RATE = 0.01
 GAMMA = 0.99
@@ -249,6 +249,7 @@ if __name__ == "__main__":
         if loss_v is None:
             continue
         loss_v.backward()
+        nn.utils.clip_grad_norm(optimizer.param_groups, max_norm=10.0, norm_type=2)
         optimizer.step()
         optimizer.zero_grad()
 
