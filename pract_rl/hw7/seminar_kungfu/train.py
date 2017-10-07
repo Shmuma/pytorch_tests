@@ -83,7 +83,8 @@ class StatefulAgent(ptan.agent.BaseAgent):
         self.state_net = state_net
         self.policy_net = policy_net
         self.sm = nn.Softmax()
-        self.action_selector = ptan.actions.ProbabilityActionSelector()
+        selector = ptan.actions.ProbabilityActionSelector()
+        self.action_selector = ptan.actions.EpsilonGreedyActionSelector(epsilon=0.25, selector=selector)
         self.cuda = cuda
 
     def initial_state(self):
