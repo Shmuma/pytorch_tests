@@ -249,7 +249,8 @@ if __name__ == "__main__":
         if loss_v is None:
             continue
         loss_v.backward()
-        nn.utils.clip_grad_norm(optimizer.param_groups, max_norm=10.0, norm_type=2)
+        params = itertools.chain(state_net.parameters(), value_net.parameters(), policy_net.parameters())
+        nn.utils.clip_grad_norm(params, max_norm=10.0, norm_type=2)
         optimizer.step()
         optimizer.zero_grad()
 
