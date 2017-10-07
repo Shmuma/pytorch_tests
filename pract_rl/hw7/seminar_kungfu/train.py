@@ -15,6 +15,7 @@ from tensorboardX import SummaryWriter
 
 log = gym.logger
 
+GAMES_COUNT = 5
 LSTM_SIZE = 512
 LEARNING_RATE = 0.01
 GAMMA = 0.99
@@ -162,6 +163,10 @@ def calculate_loss(exp, state_net, policy_net, value_net, stats_dict, cuda=False
         vals_window = vals_window[:VALUE_STEPS]
         rewards.append(vals_window[-1])
 
+    # observation ended prematurely
+    if not rewards:
+        return None
+
     # can calculate loss using precomputed approximation of total reward and our policies
     loss_v = Variable(torch.FloatTensor([0]))
     if cuda:
@@ -176,10 +181,12 @@ def calculate_loss(exp, state_net, policy_net, value_net, stats_dict, cuda=False
             total_reward_v = total_reward_v.cuda()
         loss_value_v = F.mse_loss(value_v, total_reward_v)
         # policy loss
-        loss_policy_v = torch.mul(log_policy_v[exp_item.action], (value_v.data.cpu().numpy()[0] - total_reward))
+        advantage = total_reward - value_v.data.cpu().numpy()[0]
+        loss_policy_v = torch.mul(log_policy_v[exp_item.action], -advantage)
         # entropy loss
         loss_entropy_v = ENTROPY_BETA * torch.sum(policy_v * log_policy_v)
         loss_v += loss_value_v + loss_policy_v + loss_entropy_v
+        stats_dict['advantage'] += advantage
         stats_dict['loss_count'] += 1
         stats_dict['loss_value'] += loss_value_v.data.cpu().numpy()[0]
         stats_dict['loss_policy'] += loss_policy_v.data.cpu().numpy()[0]
@@ -198,6 +205,7 @@ def report(writer, iter_idx, stats_dict):
     loss_value = stats_dict['loss_value'] / l_count
     loss_policy = stats_dict['loss_policy'] / l_count
     loss_entropy = stats_dict['loss_entropy'] / l_count
+    advantage = stats_dict['advantage'] / l_count
     log.info("%d: mean_reward=%s, done_games=%d", iter_idx, mean_reward, stats_dict.get('rewards_count', 0))
     if mean_reward is not None:
         writer.add_scalar("reward", mean_reward, iter_idx)
@@ -205,11 +213,16 @@ def report(writer, iter_idx, stats_dict):
     writer.add_scalar("loss_value", loss_value, iter_idx)
     writer.add_scalar("loss_policy", loss_policy, iter_idx)
     writer.add_scalar("loss_entropy", loss_entropy, iter_idx)
+    writer.add_scalar("advantage", advantage, iter_idx)
     stats_dict.clear()
 
 
+def make_env():
+    return ptan.common.wrappers.AtariWrapper(gym.make("KungFuMaster-v0"))
+
+
 if __name__ == "__main__":
-    env = ptan.common.wrappers.AtariWrapper(gym.make("KungFuMaster-v0"))
+    env = make_env()
 
     log.info("Observations: %s", env.observation_space)
     log.info("Actions: %s", env.action_space)
@@ -227,11 +240,13 @@ if __name__ == "__main__":
         policy_net.cuda()
 
     agent = StatefulAgent(state_net, policy_net, cuda=CUDA)
-    exp_source = ptan.experience.ExperienceSource(env, agent, steps_count=EXPERIENCE_LEN)
+    exp_source = ptan.experience.ExperienceSource([make_env() for _ in range(GAMES_COUNT)], agent, steps_count=EXPERIENCE_LEN)
     stats_dict = collections.Counter()
 
     for idx, exp in enumerate(exp_source):
         loss_v = calculate_loss(exp, state_net, policy_net, value_net, stats_dict, cuda=CUDA)
+        if loss_v is None:
+            continue
         loss_v.backward()
         optimizer.step()
         optimizer.zero_grad()
