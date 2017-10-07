@@ -91,8 +91,8 @@ class StatefulAgent(ptan.agent.BaseAgent):
         Create zero state of lstm
         :return: 
         """
-        c0 = Variable(torch.zeros((1, 1, LSTM_SIZE)))
-        h0 = Variable(torch.zeros((1, 1, LSTM_SIZE)))
+        c0 = torch.zeros((1, 1, LSTM_SIZE))
+        h0 = torch.zeros((1, 1, LSTM_SIZE))
         if self.cuda:
             return c0.cuda(), h0.cuda()
         return c0, h0
@@ -106,7 +106,7 @@ class StatefulAgent(ptan.agent.BaseAgent):
         c0_list, h0_list = zip(*agent_states)
         c0 = torch.cat(c0_list, dim=1)
         h0 = torch.cat(h0_list, dim=1)
-        return c0, h0
+        return Variable(c0), Variable(h0)
 
     def unpack_agent_states(self, agent_states):
         """
@@ -115,8 +115,8 @@ class StatefulAgent(ptan.agent.BaseAgent):
         :return: list of tuples of tensors 
         """
         c0, h0 = agent_states
-        c0_list = torch.split(c0, 1, dim=1)
-        h0_list = torch.split(h0, 1, dim=1)
+        c0_list = torch.split(c0.data, 1, dim=1)
+        h0_list = torch.split(h0.data, 1, dim=1)
         return list(zip(c0_list, h0_list))
 
     def __call__(self, states, agent_states):
