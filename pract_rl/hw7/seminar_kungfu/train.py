@@ -11,17 +11,20 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 
+from tensorboardX import SummaryWriter
 
 log = gym.logger
 
 LSTM_SIZE = 512
-LEARNING_RATE = 0.001
+LEARNING_RATE = 0.01
 GAMMA = 0.99
 VALUE_STEPS = 4
 EXPERIENCE_LEN = 10
 STATE_WARMUP_LEN = 5
 
 ENTROPY_BETA = 0.1
+REPORT_ITERS = 100
+CUDA = True
 
 
 class StateNet(nn.Module):
@@ -74,12 +77,13 @@ class ValueNet(nn.Module):
 
 
 class StatefulAgent(ptan.agent.BaseAgent):
-    def __init__(self, state_net, policy_net):
+    def __init__(self, state_net, policy_net, cuda=False):
         super(StatefulAgent, self).__init__()
         self.state_net = state_net
         self.policy_net = policy_net
         self.sm = nn.Softmax()
         self.action_selector = ptan.actions.ProbabilityActionSelector()
+        self.cuda = cuda
 
     def initial_state(self):
         """
@@ -88,6 +92,8 @@ class StatefulAgent(ptan.agent.BaseAgent):
         """
         c0 = Variable(torch.zeros((1, 1, LSTM_SIZE)))
         h0 = Variable(torch.zeros((1, 1, LSTM_SIZE)))
+        if self.cuda:
+            return c0.cuda(), h0.cuda()
         return c0, h0
 
     def pack_agent_states(self, agent_states):
@@ -115,6 +121,8 @@ class StatefulAgent(ptan.agent.BaseAgent):
     def __call__(self, states, agent_states):
         packed_states = self.pack_agent_states(agent_states)
         states_v = Variable(torch.from_numpy(states))
+        if self.cuda:
+            states_v = states_v.cuda()
         state_out, packed_states = self.state_net(states_v, packed_states)
         policy_out = self.policy_net(state_out)
         prob_out = self.sm(policy_out)
@@ -124,12 +132,14 @@ class StatefulAgent(ptan.agent.BaseAgent):
 
 # TODO: we can optimize for speed by calculating convolutions for the whole experience chain,
 # but this will require further split of state_net for conv_net and rnn_net
-def calculate_loss(exp, state_net, policy_net, value_net, stats_dict):
+def calculate_loss(exp, state_net, policy_net, value_net, stats_dict, cuda=False):
     # calculate states, values and policy for our experience sequence
     rnn_state = None
     values, policies, log_policies = [], [], []
     for exp_idx, exp_item in enumerate(exp):
         obs_v = Variable(torch.from_numpy(np.expand_dims(exp_item.state, axis=0)))
+        if cuda:
+            obs_v = obs_v.cuda()
         state_v, rnn_state = state_net(obs_v, rnn_state)
         if exp_idx >= STATE_WARMUP_LEN:
             value_v = value_net(state_v)
@@ -154,15 +164,19 @@ def calculate_loss(exp, state_net, policy_net, value_net, stats_dict):
 
     # can calculate loss using precomputed approximation of total reward and our policies
     loss_v = Variable(torch.FloatTensor([0]))
+    if cuda:
+        loss_v = loss_v.cuda()
     for exp_item, total_reward, value_v, policy_idx in zip(reversed(exp), rewards, reversed(values),
                                                            range(len(policies)-1, -1, -1)):
         policy_v = policies[policy_idx]
         log_policy_v = log_policies[policy_idx]
         # value loss
         total_reward_v = Variable(torch.FloatTensor([total_reward]))
+        if cuda:
+            total_reward_v = total_reward_v.cuda()
         loss_value_v = F.mse_loss(value_v, total_reward_v)
         # policy loss
-        loss_policy_v = torch.mul(log_policy_v[exp_item.action], -(value_v.data.cpu().numpy()[0] - total_reward))
+        loss_policy_v = torch.mul(log_policy_v[exp_item.action], (value_v.data.cpu().numpy()[0] - total_reward))
         # entropy loss
         loss_entropy_v = ENTROPY_BETA * torch.sum(policy_v * log_policy_v)
         loss_v += loss_value_v + loss_policy_v + loss_entropy_v
@@ -173,6 +187,26 @@ def calculate_loss(exp, state_net, policy_net, value_net, stats_dict):
         stats_dict['loss'] += loss_v.data.cpu().numpy()[0]
 
     return loss_v
+
+
+def report(writer, iter_idx, stats_dict):
+    mean_reward = stats_dict.get('rewards')
+    if mean_reward is not None:
+        mean_reward /= stats_dict['rewards_count']
+    l_count = stats_dict['loss_count']
+    loss = stats_dict['loss'] / l_count
+    loss_value = stats_dict['loss_value'] / l_count
+    loss_policy = stats_dict['loss_policy'] / l_count
+    loss_entropy = stats_dict['loss_entropy'] / l_count
+    log.info("%d: mean_reward=%s, done_games=%d", iter_idx, mean_reward, stats_dict.get('rewards_count', 0))
+    if mean_reward is not None:
+        writer.add_scalar("reward", mean_reward, iter_idx)
+    writer.add_scalar("loss_total", loss, iter_idx)
+    writer.add_scalar("loss_value", loss_value, iter_idx)
+    writer.add_scalar("loss_policy", loss_policy, iter_idx)
+    writer.add_scalar("loss_entropy", loss_entropy, iter_idx)
+    stats_dict.clear()
+
 
 if __name__ == "__main__":
     env = ptan.common.wrappers.AtariWrapper(gym.make("KungFuMaster-v0"))
@@ -185,16 +219,28 @@ if __name__ == "__main__":
     policy_net = PolicyNet(LSTM_SIZE, env.action_space.n)
     params = itertools.chain(state_net.parameters(), value_net.parameters(), policy_net.parameters())
     optimizer = optim.RMSprop(params, lr=LEARNING_RATE)
+    writer = SummaryWriter(comment="-first")
 
-    agent = StatefulAgent(state_net, policy_net)
+    if CUDA:
+        state_net.cuda()
+        value_net.cuda()
+        policy_net.cuda()
+
+    agent = StatefulAgent(state_net, policy_net, cuda=CUDA)
     exp_source = ptan.experience.ExperienceSource(env, agent, steps_count=EXPERIENCE_LEN)
     stats_dict = collections.Counter()
 
     for idx, exp in enumerate(exp_source):
-        optimizer.zero_grad()
-        loss_v = calculate_loss(exp, state_net, policy_net, value_net, stats_dict)
+        loss_v = calculate_loss(exp, state_net, policy_net, value_net, stats_dict, cuda=CUDA)
         loss_v.backward()
         optimizer.step()
-        log.info("%d: loss=%.5f, %s", idx, stats_dict['loss'], str(stats_dict))
-        stats_dict.clear()
+        optimizer.zero_grad()
+
+        rewards = exp_source.pop_total_rewards()
+        if rewards:
+            stats_dict['rewards'] += np.sum(rewards)
+            stats_dict['rewards_count'] += len(rewards)
+
+        if (idx+1) % REPORT_ITERS == 0:
+            report(writer, idx+1, stats_dict)
     pass
