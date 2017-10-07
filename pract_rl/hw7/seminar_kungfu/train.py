@@ -1,18 +1,27 @@
 #!/usr/bin/env python3
 import gym
 import ptan
+import itertools
+import collections
 import numpy as np
 
 import torch
 from torch.autograd import Variable
 import torch.nn as nn
-import torchvision.utils as vutils
+import torch.nn.functional as F
+import torch.optim as optim
 
-import cv2
 
 log = gym.logger
 
 LSTM_SIZE = 512
+LEARNING_RATE = 0.001
+GAMMA = 0.99
+VALUE_STEPS = 4
+EXPERIENCE_LEN = 10
+STATE_WARMUP_LEN = 5
+
+ENTROPY_BETA = 0.1
 
 
 class StateNet(nn.Module):
@@ -113,21 +122,79 @@ class StatefulAgent(ptan.agent.BaseAgent):
         return actions, self.unpack_agent_states(packed_states)
 
 
+# TODO: we can optimize for speed by calculating convolutions for the whole experience chain,
+# but this will require further split of state_net for conv_net and rnn_net
+def calculate_loss(exp, state_net, policy_net, value_net, stats_dict):
+    # calculate states, values and policy for our experience sequence
+    rnn_state = None
+    values, policies, log_policies = [], [], []
+    for exp_idx, exp_item in enumerate(exp):
+        obs_v = Variable(torch.from_numpy(np.expand_dims(exp_item.state, axis=0)))
+        state_v, rnn_state = state_net(obs_v, rnn_state)
+        if exp_idx >= STATE_WARMUP_LEN:
+            value_v = value_net(state_v)
+            raw_logits_v = policy_net(state_v)
+            log_policy_v = F.log_softmax(raw_logits_v)
+            policy_v = F.softmax(raw_logits_v)
+            values.append(value_v[0])
+            policies.append(policy_v[0])
+            log_policies.append(log_policy_v[0])
+
+    # calculate accumulated discounted rewards using VALUE_STEPS Bellman approximation
+    rewards = []
+    vals_window = []
+    for exp_item, value_v in reversed(list(zip(exp, values))):
+        vals_window = [exp_item.reward + GAMMA * val for val in vals_window]
+        reward = exp_item.reward
+        if not exp_item.done:
+            reward += value_v.data.cpu().numpy()[0]
+        vals_window.insert(0, reward)
+        vals_window = vals_window[:VALUE_STEPS]
+        rewards.append(vals_window[-1])
+
+    # can calculate loss using precomputed approximation of total reward and our policies
+    loss_v = Variable(torch.FloatTensor([0]))
+    for exp_item, total_reward, value_v, policy_idx in zip(reversed(exp), rewards, reversed(values),
+                                                           range(len(policies)-1, -1, -1)):
+        policy_v = policies[policy_idx]
+        log_policy_v = log_policies[policy_idx]
+        # value loss
+        total_reward_v = Variable(torch.FloatTensor([total_reward]))
+        loss_value_v = F.mse_loss(value_v, total_reward_v)
+        # policy loss
+        loss_policy_v = torch.mul(log_policy_v[exp_item.action], -(value_v.data.cpu().numpy()[0] - total_reward))
+        # entropy loss
+        loss_entropy_v = ENTROPY_BETA * torch.sum(policy_v * log_policy_v)
+        loss_v += loss_value_v + loss_policy_v + loss_entropy_v
+        stats_dict['loss_count'] += 1
+        stats_dict['loss_value'] += loss_value_v.data.cpu().numpy()[0]
+        stats_dict['loss_policy'] += loss_policy_v.data.cpu().numpy()[0]
+        stats_dict['loss_entropy'] += loss_entropy_v.data.cpu().numpy()[0]
+        stats_dict['loss'] += loss_v.data.cpu().numpy()[0]
+
+    return loss_v
+
 if __name__ == "__main__":
     env = ptan.common.wrappers.AtariWrapper(gym.make("KungFuMaster-v0"))
 
     log.info("Observations: %s", env.observation_space)
     log.info("Actions: %s", env.action_space)
 
-    obs = env.reset()
     state_net = StateNet(env.observation_space.shape, LSTM_SIZE)
     value_net = ValueNet(LSTM_SIZE)
     policy_net = PolicyNet(LSTM_SIZE, env.action_space.n)
+    params = itertools.chain(state_net.parameters(), value_net.parameters(), policy_net.parameters())
+    optimizer = optim.RMSprop(params, lr=LEARNING_RATE)
 
     agent = StatefulAgent(state_net, policy_net)
-    exp_source = ptan.experience.ExperienceSource(env, agent, steps_count=10)
+    exp_source = ptan.experience.ExperienceSource(env, agent, steps_count=EXPERIENCE_LEN)
+    stats_dict = collections.Counter()
 
-    for exp in exp_source:
-        print(exp)
-        break
+    for idx, exp in enumerate(exp_source):
+        optimizer.zero_grad()
+        loss_v = calculate_loss(exp, state_net, policy_net, value_net, stats_dict)
+        loss_v.backward()
+        optimizer.step()
+        log.info("%d: loss=%.5f, %s", idx, stats_dict['loss'], str(stats_dict))
+        stats_dict.clear()
     pass
