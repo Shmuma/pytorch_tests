@@ -26,6 +26,7 @@ STATE_WARMUP_LEN = 5
 ENTROPY_BETA = 0.1
 REPORT_ITERS = 100
 BATCH_ITERS = 4
+SYNC_ITERS = 10
 CUDA = True
 
 
@@ -189,6 +190,7 @@ def calculate_loss(exp, state_net, policy_net, value_net, stats_dict, cuda=False
         loss_entropy_v = ENTROPY_BETA * torch.sum(policy_v * log_policy_v)
         loss_v += loss_value_v + loss_policy_v + loss_entropy_v
         stats_dict['advantage'] += advantage
+        stats_dict['reward_disc'] += total_reward
         stats_dict['loss_count'] += 1
         stats_dict['loss_value'] += loss_value_v.data.cpu().numpy()[0]
         stats_dict['loss_policy'] += loss_policy_v.data.cpu().numpy()[0]
@@ -208,9 +210,11 @@ def report(writer, iter_idx, stats_dict):
     loss_policy = stats_dict['loss_policy'] / l_count
     loss_entropy = stats_dict['loss_entropy'] / l_count
     advantage = stats_dict['advantage'] / l_count
+    reward_disc = stats_dict['reward_disc'] / l_count
     log.info("%d: mean_reward=%s, done_games=%d", iter_idx, mean_reward, stats_dict.get('rewards_count', 0))
     if mean_reward is not None:
         writer.add_scalar("reward", mean_reward, iter_idx)
+    writer.add_scalar("reward_disc", reward_disc, iter_idx)
     writer.add_scalar("loss_total", loss, iter_idx)
     writer.add_scalar("loss_value", loss_value, iter_idx)
     writer.add_scalar("loss_policy", loss_policy, iter_idx)
@@ -236,12 +240,15 @@ if __name__ == "__main__":
     optimizer = optim.RMSprop(params, lr=LEARNING_RATE)
     writer = SummaryWriter(comment="-first")
 
+    target_state_net = ptan.agent.TargetNet(state_net)
+    target_policy_net = ptan.agent.TargetNet(policy_net)
+
     if CUDA:
         state_net.cuda()
         value_net.cuda()
         policy_net.cuda()
 
-    agent = StatefulAgent(state_net, policy_net, cuda=CUDA)
+    agent = StatefulAgent(target_state_net.target_model, target_policy_net.target_model, cuda=False)
     exp_source = ptan.experience.ExperienceSource([make_env() for _ in range(GAMES_COUNT)],
                                                   agent, steps_count=EXPERIENCE_LEN, steps_delta=5)
     stats_dict = collections.Counter()
@@ -257,6 +264,10 @@ if __name__ == "__main__":
     #        nn.utils.clip_grad_norm(params, max_norm=10.0, norm_type=2)
             optimizer.step()
             optimizer.zero_grad()
+
+        if (idx+1) % SYNC_ITERS == 0:
+            target_state_net.sync()
+            target_policy_net.sync()
 
         rewards = exp_source.pop_total_rewards()
         if rewards:
