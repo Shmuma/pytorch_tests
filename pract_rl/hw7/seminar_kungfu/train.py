@@ -171,7 +171,7 @@ def calculate_loss(exp, state_net, policy_net, value_net, stats_dict, cuda=False
             rewards.append(vals_window[-1])
 
     # observation ended prematurely
-    if not rewards:
+    if not rewards or all(map(lambda r: r is None, rewards)):
         return None
 
     # can calculate loss using precomputed approximation of total reward and our policies

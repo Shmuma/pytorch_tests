@@ -37,4 +37,6 @@ The next two experiments will be:
 * to disable updates with too short value steps.
 * decrease LR even more, to 0.0001
 
+Running experiments:
+1. Oct08_18-23-34_gpu-no-short-rw -- the same params, no short reward updates
 
