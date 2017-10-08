@@ -39,4 +39,5 @@ The next two experiments will be:
 
 Running experiments:
 1. Oct08_18-23-34_gpu-no-short-rw -- the same params, no short reward updates
+2. Oct08_18-24-54_gpu-no-short-rw-lr=1e-5 -- the same, lr=1e-5
 
