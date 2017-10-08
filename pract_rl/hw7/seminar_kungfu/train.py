@@ -25,6 +25,7 @@ STATE_WARMUP_LEN = 5
 
 ENTROPY_BETA = 0.1
 REPORT_ITERS = 100
+BATCH_ITERS = 4
 CUDA = True
 
 
@@ -250,10 +251,12 @@ if __name__ == "__main__":
         if loss_v is None:
             continue
         loss_v.backward()
-        params = itertools.chain(state_net.parameters(), value_net.parameters(), policy_net.parameters())
-#        nn.utils.clip_grad_norm(params, max_norm=10.0, norm_type=2)
-        optimizer.step()
-        optimizer.zero_grad()
+        # perform update of gradients in batches. It's the same as do minibatches, but less parallel in GPU
+        if (idx+1) % BATCH_ITERS == 0:
+    #        params = itertools.chain(state_net.parameters(), value_net.parameters(), policy_net.parameters())
+    #        nn.utils.clip_grad_norm(params, max_norm=10.0, norm_type=2)
+            optimizer.step()
+            optimizer.zero_grad()
 
         rewards = exp_source.pop_total_rewards()
         if rewards:
