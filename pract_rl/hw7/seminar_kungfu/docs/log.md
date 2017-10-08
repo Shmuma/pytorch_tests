@@ -12,6 +12,10 @@ But still, current version entropy value is almost 0, which is strange, maybe it
 2. increase entropy beta from 0.1 to higher values
 
 Currently running versions:
-1. Oct08_11-00-43_home-first -- no target network
+1. Oct08_11-00-43_home-first -- no target network (no convergence, stopped)
 2. Oct08_11-21-59_gpu-first -- with target network every 10 iters
 3. Oct08_11-36-22_gpu-clip -- target net + gradient clipping (L2 norm <= 10)
+4. Oct08_13-39-27_home-lr=0.001 -- the same, but with LR=0.001 (10 times less than before)
+
+After looking at net with and without clipping, I have impression that clipping is only makes it worse.
+Stopped version 3, restarted it without clipping but with lower LR

@@ -17,7 +17,7 @@ log = gym.logger
 
 GAMES_COUNT = 10
 LSTM_SIZE = 512
-LEARNING_RATE = 0.01
+LEARNING_RATE = 0.001
 GAMMA = 0.99
 VALUE_STEPS = 4
 EXPERIENCE_LEN = 10
@@ -238,7 +238,7 @@ if __name__ == "__main__":
     policy_net = PolicyNet(LSTM_SIZE, env.action_space.n)
     params = itertools.chain(state_net.parameters(), value_net.parameters(), policy_net.parameters())
     optimizer = optim.RMSprop(params, lr=LEARNING_RATE)
-    writer = SummaryWriter(comment="-clip")
+    writer = SummaryWriter(comment="-lr=0.001")
 
     target_state_net = ptan.agent.TargetNet(state_net)
     target_policy_net = ptan.agent.TargetNet(policy_net)
