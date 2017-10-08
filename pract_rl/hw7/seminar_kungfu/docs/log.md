@@ -46,3 +46,5 @@ Version with 1e-5 earned 6000 scores, but learned it back. What is strange -- va
 I think key here is to make this value learned quickly.
 
 Maybe, prioritized experience replay will help here a lot.
+
+First version was stopped and started version with increased batch size (4 -> 64)

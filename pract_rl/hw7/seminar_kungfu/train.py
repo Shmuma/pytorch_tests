@@ -25,7 +25,7 @@ STATE_WARMUP_LEN = 5
 
 ENTROPY_BETA = 0.1
 REPORT_ITERS = 100
-BATCH_ITERS = 4
+BATCH_ITERS = 64
 SYNC_ITERS = 10
 CUDA = True
 
@@ -244,7 +244,7 @@ if __name__ == "__main__":
     policy_net = PolicyNet(LSTM_SIZE, env.action_space.n)
     params = itertools.chain(state_net.parameters(), value_net.parameters(), policy_net.parameters())
     optimizer = optim.RMSprop(params, lr=LEARNING_RATE)
-    writer = SummaryWriter(comment="-no-short-rw-lr=1e-5")
+    writer = SummaryWriter(comment="-lr=1e-5-batch=64")
 
     target_state_net = ptan.agent.TargetNet(state_net)
     target_policy_net = ptan.agent.TargetNet(policy_net)
