@@ -48,3 +48,4 @@ I think key here is to make this value learned quickly.
 Maybe, prioritized experience replay will help here a lot.
 
 First version was stopped and started version with increased batch size (4 -> 64)
+This version is Oct08_20-18-21_gpu-lr=1e-5-batch=64
