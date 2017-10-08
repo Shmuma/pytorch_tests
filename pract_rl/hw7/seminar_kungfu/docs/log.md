@@ -22,3 +22,11 @@ Stopped version 3, restarted it without clipping but with lower LR
 
 Version without clipping stagnated with entropy_loss=0.0...
 Next try is to leave clip, but increase it to 100.0
+
+Item 2 don't have much progress, stopped.
+
+Next experiment will be to disable epsilon-greedy. So, I have those versions running:
+
+1. Oct08_13-39-27_home-lr=0.001 -- no clipping, small LR
+2. Oct08_15-15-04_gpu-lr=0.001-clp=100 -- clipping 100, small LR, almost the same progress as 1
+3. Oct08_17-00-31_gpu-lr=0.001-clp=100 -- the same, no epsilon greedy
