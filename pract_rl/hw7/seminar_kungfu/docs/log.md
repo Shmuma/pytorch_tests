@@ -19,3 +19,6 @@ Currently running versions:
 
 After looking at net with and without clipping, I have impression that clipping is only makes it worse.
 Stopped version 3, restarted it without clipping but with lower LR
+
+Version without clipping stagnated with entropy_loss=0.0...
+Next try is to leave clip, but increase it to 100.0

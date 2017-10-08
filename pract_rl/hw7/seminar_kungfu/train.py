@@ -238,7 +238,7 @@ if __name__ == "__main__":
     policy_net = PolicyNet(LSTM_SIZE, env.action_space.n)
     params = itertools.chain(state_net.parameters(), value_net.parameters(), policy_net.parameters())
     optimizer = optim.RMSprop(params, lr=LEARNING_RATE)
-    writer = SummaryWriter(comment="-lr=0.001-noclip")
+    writer = SummaryWriter(comment="-lr=0.001-clp=100")
 
     target_state_net = ptan.agent.TargetNet(state_net)
     target_policy_net = ptan.agent.TargetNet(policy_net)
@@ -260,8 +260,8 @@ if __name__ == "__main__":
         loss_v.backward()
         # perform update of gradients in batches. It's the same as do minibatches, but less parallel in GPU
         if (idx+1) % BATCH_ITERS == 0:
-            # params = itertools.chain(state_net.parameters(), value_net.parameters(), policy_net.parameters())
-            # nn.utils.clip_grad_norm(params, max_norm=10.0, norm_type=2)
+            params = itertools.chain(state_net.parameters(), value_net.parameters(), policy_net.parameters())
+            nn.utils.clip_grad_norm(params, max_norm=100.0, norm_type=2)
             optimizer.step()
             optimizer.zero_grad()
 
