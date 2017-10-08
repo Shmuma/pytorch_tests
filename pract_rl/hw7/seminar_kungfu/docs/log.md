@@ -30,3 +30,11 @@ Next experiment will be to disable epsilon-greedy. So, I have those versions run
 1. Oct08_13-39-27_home-lr=0.001 -- no clipping, small LR
 2. Oct08_15-15-04_gpu-lr=0.001-clp=100 -- clipping 100, small LR, almost the same progress as 1
 3. Oct08_17-00-31_gpu-lr=0.001-clp=100 -- the same, no epsilon greedy
+
+Without epsilon-greedy dynamics is the same as with it.
+
+The next two experiments will be:
+* to disable updates with too short value steps.
+* decrease LR even more, to 0.0001
+
+

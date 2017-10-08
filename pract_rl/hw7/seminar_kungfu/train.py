@@ -164,7 +164,11 @@ def calculate_loss(exp, state_net, policy_net, value_net, stats_dict, cuda=False
             reward += value_v.data.cpu().numpy()[0]
         vals_window.insert(0, reward)
         vals_window = vals_window[:VALUE_STEPS]
-        rewards.append(vals_window[-1])
+        # window is too short, do not count this experience
+        if len(vals_window) < VALUE_STEPS:
+            rewards.append(None)
+        else:
+            rewards.append(vals_window[-1])
 
     # observation ended prematurely
     if not rewards:
@@ -176,6 +180,8 @@ def calculate_loss(exp, state_net, policy_net, value_net, stats_dict, cuda=False
         loss_v = loss_v.cuda()
     for exp_item, total_reward, value_v, policy_idx in zip(reversed(exp), rewards, reversed(values),
                                                            range(len(policies)-1, -1, -1)):
+        if total_reward is None:
+            continue
         policy_v = policies[policy_idx]
         log_policy_v = log_policies[policy_idx]
         # value loss
@@ -238,7 +244,7 @@ if __name__ == "__main__":
     policy_net = PolicyNet(LSTM_SIZE, env.action_space.n)
     params = itertools.chain(state_net.parameters(), value_net.parameters(), policy_net.parameters())
     optimizer = optim.RMSprop(params, lr=LEARNING_RATE)
-    writer = SummaryWriter(comment="-lr=0.001-clp=100")
+    writer = SummaryWriter(comment="-no-short-rw")
 
     target_state_net = ptan.agent.TargetNet(state_net)
     target_policy_net = ptan.agent.TargetNet(policy_net)
