@@ -56,3 +56,13 @@ Last two variants (with LR=1e-5 and batch=64) are good, batch=64 is more or less
 could achieve 12000 score (TODO: check state of the art).
 
 Next steps will be to implement periodical test on frozen network and do saving of the best model.
+
+Test implemented and stated. Additional tweak is to scale the reward /100:
+1. Oct09_16-03-49_gpu-lr=1e-5-batch=64-test-1 -- save of tests
+2. Oct09_16-37-54_gpu-rw-scale -- with scaling of the reward
+
+Scaling slowed down convergence a lot. Looks like I need to tune hyperparams again for scaled version.
+
+* Try to decrease entropy beta to 0.01 -> dynamic is almost the same
+* Try to increase LR to 5e-5 (5x),
+* Try to increase entropy beta to 1.0
