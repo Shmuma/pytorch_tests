@@ -24,6 +24,7 @@ GAMMA = 0.99
 VALUE_STEPS = 4
 EXPERIENCE_LEN = 10
 STATE_WARMUP_LEN = 5
+REWARD_SCALE = 1.0/100
 
 ENTROPY_BETA = 0.1
 REPORT_ITERS = 100
@@ -142,7 +143,7 @@ class StatefulAgent(ptan.agent.BaseAgent):
 
 # TODO: we can optimize for speed by calculating convolutions for the whole experience chain,
 # but this will require further split of state_net for conv_net and rnn_net
-def calculate_loss(exp, state_net, policy_net, value_net, stats_dict, cuda=False):
+def calculate_loss(exp, state_net, policy_net, value_net, stats_dict, cuda=False, scale_reward=1.0):
     # calculate states, values and policy for our experience sequence
     rnn_state = None
     values, policies, log_policies = [], [], []
@@ -164,8 +165,8 @@ def calculate_loss(exp, state_net, policy_net, value_net, stats_dict, cuda=False
     rewards = []
     vals_window = []
     for exp_item, value_v in reversed(list(zip(exp, values))):
-        vals_window = [exp_item.reward + GAMMA * val for val in vals_window]
-        reward = exp_item.reward
+        reward = exp_item.reward * scale_reward
+        vals_window = [reward + GAMMA * val for val in vals_window]
         if not exp_item.done:
             reward += value_v.data.cpu().numpy()[0]
         vals_window.insert(0, reward)
@@ -270,7 +271,7 @@ def test_model(envs, agent):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("-n", "--name", default='test', help="Name of the run, used as suffix for TB and saves dir")
+    parser.add_argument("-n", "--name", default='rw-scale', help="Name of the run, used as suffix for TB and saves dir")
     args = parser.parse_args()
 
     saves_dir = os.path.join(SAVES_DIR, args.name)
@@ -286,7 +287,7 @@ if __name__ == "__main__":
     policy_net = PolicyNet(LSTM_SIZE, env.action_space.n)
     params = itertools.chain(state_net.parameters(), value_net.parameters(), policy_net.parameters())
     optimizer = optim.RMSprop(params, lr=LEARNING_RATE)
-    writer = SummaryWriter(comment="-lr=1e-5-batch=64-test-1")
+    writer = SummaryWriter(comment="-rw-scale")
 
     target_state_net = ptan.agent.TargetNet(state_net)
     target_policy_net = ptan.agent.TargetNet(policy_net)
@@ -306,7 +307,8 @@ if __name__ == "__main__":
     best_test_reward = None
 
     for idx, exp in enumerate(exp_source):
-        loss_v = calculate_loss(exp, state_net, policy_net, value_net, stats_dict, cuda=CUDA)
+        loss_v = calculate_loss(exp, state_net, policy_net, value_net, stats_dict, cuda=CUDA,
+                                scale_reward=REWARD_SCALE)
         if loss_v is None:
             continue
         loss_v.backward()
