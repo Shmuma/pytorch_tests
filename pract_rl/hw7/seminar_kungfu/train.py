@@ -201,7 +201,7 @@ def calculate_loss(exp, state_net, policy_net, value_net, stats_dict, cuda=False
         loss_policy_v = torch.mul(log_policy_v[exp_item.action], -advantage)
         # entropy loss
         loss_entropy_v = ENTROPY_BETA * torch.sum(policy_v * log_policy_v)
-        loss_v += loss_value_v + loss_policy_v + loss_entropy_v
+        loss_v += loss_value_v + 0.1 * loss_policy_v + loss_entropy_v
         stats_dict['advantage'] += advantage
         stats_dict['reward_disc'] += total_reward
         stats_dict['loss_count'] += 1
@@ -287,7 +287,7 @@ if __name__ == "__main__":
     policy_net = PolicyNet(LSTM_SIZE, env.action_space.n)
     params = itertools.chain(state_net.parameters(), value_net.parameters(), policy_net.parameters())
     optimizer = optim.RMSprop(params, lr=LEARNING_RATE)
-    writer = SummaryWriter(comment="-rw-scale-lr=5e-5-beta=1")
+    writer = SummaryWriter(comment="-tweaks")
 
     target_state_net = ptan.agent.TargetNet(state_net)
     target_policy_net = ptan.agent.TargetNet(policy_net)
