@@ -27,6 +27,8 @@ ENTROPY_BETA = 0.1
 REPORT_ITERS = 100
 BATCH_ITERS = 64
 SYNC_ITERS = 10
+TEST_ITERS = 500
+TEST_GAMES = 5
 CUDA = True
 
 
@@ -233,6 +235,35 @@ def make_env():
     return ptan.common.wrappers.AtariWrapper(gym.make("KungFuMaster-v0"))
 
 
+def test_model(envs, agent):
+    """
+    Play full episode for the set of environments and calculate average reward over full episode
+    :param envs: list of environments to test on
+    :param agent: agent to choose actions 
+    :return: mean reward accumulated by the agent 
+    """
+    alive_envs = [env for env in envs]
+    states = [env.reset() for env in envs]
+    agent_states = [agent.initial_state() for _ in envs]
+    total_reward = 0.0
+
+    while alive_envs:
+        states_a = np.stack(states)
+        actions, new_agent_states = agent(states_a, agent_states)
+        new_alive_envs = []
+        states, agent_states = [], []
+        for env, action, new_agent_state in zip(alive_envs, actions, new_agent_states):
+            state, reward, is_done, _ = env.step(action)
+            total_reward += reward
+            if not is_done:
+                new_alive_envs.append(env)
+                states.append(state)
+                agent_states.append(new_agent_state)
+        alive_envs = new_alive_envs
+
+    return total_reward / len(envs)
+
+
 if __name__ == "__main__":
     env = make_env()
 
@@ -244,7 +275,7 @@ if __name__ == "__main__":
     policy_net = PolicyNet(LSTM_SIZE, env.action_space.n)
     params = itertools.chain(state_net.parameters(), value_net.parameters(), policy_net.parameters())
     optimizer = optim.RMSprop(params, lr=LEARNING_RATE)
-    writer = SummaryWriter(comment="-lr=1e-5-batch=64")
+    writer = SummaryWriter(comment="-lr=1e-5-batch=64-test-1")
 
     target_state_net = ptan.agent.TargetNet(state_net)
     target_policy_net = ptan.agent.TargetNet(policy_net)
@@ -258,6 +289,8 @@ if __name__ == "__main__":
     exp_source = ptan.experience.ExperienceSource([make_env() for _ in range(GAMES_COUNT)],
                                                   agent, steps_count=EXPERIENCE_LEN, steps_delta=5)
     stats_dict = collections.Counter()
+
+    test_envs = [make_env() for _ in range(TEST_GAMES)]
 
     for idx, exp in enumerate(exp_source):
         loss_v = calculate_loss(exp, state_net, policy_net, value_net, stats_dict, cuda=CUDA)
@@ -282,4 +315,9 @@ if __name__ == "__main__":
 
         if (idx+1) % REPORT_ITERS == 0:
             report(writer, idx+1, stats_dict)
+
+        if (idx+1) % TEST_ITERS == 0:
+            mean_reward = test_model(test_envs, agent)
+            log.info("Test: %.3f mean reward", mean_reward)
+            writer.add_scalar("test_reward", mean_reward, idx)
     pass
