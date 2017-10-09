@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
+import os
 import gym
 import ptan
+import argparse
 import itertools
 import collections
 import numpy as np
@@ -30,6 +32,8 @@ SYNC_ITERS = 10
 TEST_ITERS = 500
 TEST_GAMES = 5
 CUDA = True
+
+SAVES_DIR = "saves"
 
 
 class StateNet(nn.Module):
@@ -265,6 +269,13 @@ def test_model(envs, agent):
 
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument("-n", "--name", default='test', help="Name of the run, used as suffix for TB and saves dir")
+    args = parser.parse_args()
+
+    saves_dir = os.path.join(SAVES_DIR, args.name)
+    os.makedirs(saves_dir, exist_ok=True)
+
     env = make_env()
 
     log.info("Observations: %s", env.observation_space)
@@ -292,6 +303,8 @@ if __name__ == "__main__":
 
     test_envs = [make_env() for _ in range(TEST_GAMES)]
 
+    best_test_reward = None
+
     for idx, exp in enumerate(exp_source):
         loss_v = calculate_loss(exp, state_net, policy_net, value_net, stats_dict, cuda=CUDA)
         if loss_v is None:
@@ -318,6 +331,16 @@ if __name__ == "__main__":
 
         if (idx+1) % TEST_ITERS == 0:
             mean_reward = test_model(test_envs, agent)
-            log.info("Test: %.3f mean reward", mean_reward)
+            if best_test_reward is None or mean_reward > best_test_reward:
+                if best_test_reward is not None:
+                    log.info("Test: %.3f mean reward, best updated %.3f -> %.3f",
+                             mean_reward, best_test_reward, mean_reward)
+                    base_name = os.path.join(saves_dir, "model-%06.2f-" % mean_reward)
+                    torch.save(state_net.state_dict(), base_name + "state.data")
+                    torch.save(value_net.state_dict(), base_name + "value.data")
+                    torch.save(policy_net.state_dict(), base_name + "policy.data")
+                best_test_reward = mean_reward
+            else:
+                log.info("Test: %.3f mean reward", mean_reward)
             writer.add_scalar("test_reward", mean_reward, idx)
     pass
