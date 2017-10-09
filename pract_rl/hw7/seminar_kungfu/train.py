@@ -2,6 +2,7 @@
 import os
 import gym
 import ptan
+import random
 import argparse
 import itertools
 import collections
@@ -143,7 +144,7 @@ class StatefulAgent(ptan.agent.BaseAgent):
 
 # TODO: we can optimize for speed by calculating convolutions for the whole experience chain,
 # but this will require further split of state_net for conv_net and rnn_net
-def calculate_loss(exp, state_net, policy_net, value_net, stats_dict, cuda=False, scale_reward=1.0):
+def calculate_loss(exp, state_net, policy_net, value_net, stats_dict, cuda=False, scale_reward=1.0, policy_round=False):
     # calculate states, values and policy for our experience sequence
     rnn_state = None
     values, policies, log_policies = [], [], []
@@ -201,7 +202,10 @@ def calculate_loss(exp, state_net, policy_net, value_net, stats_dict, cuda=False
         loss_policy_v = torch.mul(log_policy_v[exp_item.action], -advantage)
         # entropy loss
         loss_entropy_v = ENTROPY_BETA * torch.sum(policy_v * log_policy_v)
-        loss_v += loss_value_v + 0.1 * loss_policy_v + loss_entropy_v
+        if policy_round:
+            loss_v += loss_policy_v + loss_entropy_v
+        else:
+            loss_v += loss_value_v
         stats_dict['advantage'] += advantage
         stats_dict['reward_disc'] += total_reward
         stats_dict['loss_count'] += 1
@@ -287,7 +291,7 @@ if __name__ == "__main__":
     policy_net = PolicyNet(LSTM_SIZE, env.action_space.n)
     params = itertools.chain(state_net.parameters(), value_net.parameters(), policy_net.parameters())
     optimizer = optim.RMSprop(params, lr=LEARNING_RATE)
-    writer = SummaryWriter(comment="-tweaks")
+    writer = SummaryWriter(comment="-rounds")
 
     target_state_net = ptan.agent.TargetNet(state_net)
     target_policy_net = ptan.agent.TargetNet(policy_net)
@@ -306,9 +310,11 @@ if __name__ == "__main__":
 
     best_test_reward = None
 
+    policy_round = random.choice([True, False])
+
     for idx, exp in enumerate(exp_source):
         loss_v = calculate_loss(exp, state_net, policy_net, value_net, stats_dict, cuda=CUDA,
-                                scale_reward=REWARD_SCALE)
+                                scale_reward=REWARD_SCALE, policy_round=policy_round)
         if loss_v is None:
             continue
         loss_v.backward()
@@ -322,6 +328,7 @@ if __name__ == "__main__":
         if (idx+1) % SYNC_ITERS == 0:
             target_state_net.sync()
             target_policy_net.sync()
+            policy_round = random.choice([True, False])
 
         rewards = exp_source.pop_total_rewards()
         if rewards:

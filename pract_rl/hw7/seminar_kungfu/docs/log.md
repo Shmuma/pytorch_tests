@@ -67,3 +67,6 @@ Scaling slowed down convergence a lot. Looks like I need to tune hyperparams aga
 * Try to increase LR to 5e-5 (5x),
 * Try to increase entropy beta to 1.0 - do not converge
 * Played with game parameters a bit
+
+Experiment:
+try to exchange policy learning with value-learning rounds.
