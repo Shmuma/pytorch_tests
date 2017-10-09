@@ -49,3 +49,10 @@ Maybe, prioritized experience replay will help here a lot.
 
 First version was stopped and started version with increased batch size (4 -> 64)
 This version is Oct08_20-18-21_gpu-lr=1e-5-batch=64
+
+# 2017-10-09
+
+Last two variants (with LR=1e-5 and batch=64) are good, batch=64 is more or less stable and 
+could achieve 12000 score (TODO: check state of the art).
+
+Next steps will be to implement periodical test on frozen network and do saving of the best model.
