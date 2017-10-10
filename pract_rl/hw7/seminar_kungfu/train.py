@@ -20,14 +20,13 @@ log = gym.logger
 
 GAMES_COUNT = 10
 LSTM_SIZE = 512
-LEARNING_RATE = 0.0005
+LEARNING_RATE = 0.0001
 GAMMA = 0.99
 VALUE_STEPS = 4
 EXPERIENCE_LEN = 20
 STATE_WARMUP_LEN = 10
-REWARD_SCALE = 1.0/100
 
-ENTROPY_BETA = 0.01
+ENTROPY_BETA = 0.1
 REPORT_ITERS = 100
 BATCH_ITERS = 64
 SYNC_ITERS = 100
@@ -144,7 +143,7 @@ class StatefulAgent(ptan.agent.BaseAgent):
 
 # TODO: we can optimize for speed by calculating convolutions for the whole experience chain,
 # but this will require further split of state_net for conv_net and rnn_net
-def calculate_loss(exp, state_net, policy_net, value_net, stats_dict, cuda=False, scale_reward=1.0, policy_round=False):
+def calculate_loss(exp, state_net, policy_net, value_net, stats_dict, cuda=False):
     # calculate states, values and policy for our experience sequence
     rnn_state = None
     values, policies, log_policies = [], [], []
@@ -166,7 +165,7 @@ def calculate_loss(exp, state_net, policy_net, value_net, stats_dict, cuda=False
     rewards = []
     vals_window = []
     for exp_item, value_v in reversed(list(zip(exp, values))):
-        reward = exp_item.reward * scale_reward
+        reward = exp_item.reward
         vals_window = [reward + GAMMA * val for val in vals_window]
         if not exp_item.done:
             reward += value_v.data.cpu().numpy()[0]
@@ -202,10 +201,7 @@ def calculate_loss(exp, state_net, policy_net, value_net, stats_dict, cuda=False
         loss_policy_v = torch.mul(log_policy_v[exp_item.action], -advantage)
         # entropy loss
         loss_entropy_v = ENTROPY_BETA * torch.sum(policy_v * log_policy_v)
-        if policy_round:
-            loss_v += loss_policy_v + loss_entropy_v
-        else:
-            loss_v += loss_value_v
+        loss_v += loss_value_v + loss_policy_v + loss_entropy_v
         stats_dict['advantage'] += advantage
         stats_dict['reward_disc'] += total_reward
         stats_dict['loss_count'] += 1
@@ -275,7 +271,7 @@ def test_model(envs, agent):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("-n", "--name", default='rw-scale', help="Name of the run, used as suffix for TB and saves dir")
+    parser.add_argument("-n", "--name", default='exp-len', help="Name of the run, used as suffix for TB and saves dir")
     args = parser.parse_args()
 
     saves_dir = os.path.join(SAVES_DIR, args.name)
@@ -291,7 +287,7 @@ if __name__ == "__main__":
     policy_net = PolicyNet(LSTM_SIZE, env.action_space.n)
     params = itertools.chain(state_net.parameters(), value_net.parameters(), policy_net.parameters())
     optimizer = optim.RMSprop(params, lr=LEARNING_RATE)
-    writer = SummaryWriter(comment="-rounds")
+    writer = SummaryWriter(comment="-exp-len")
 
     target_state_net = ptan.agent.TargetNet(state_net)
     target_policy_net = ptan.agent.TargetNet(policy_net)
@@ -310,11 +306,8 @@ if __name__ == "__main__":
 
     best_test_reward = None
 
-    policy_round = random.choice([True, False])
-
     for idx, exp in enumerate(exp_source):
-        loss_v = calculate_loss(exp, state_net, policy_net, value_net, stats_dict, cuda=CUDA,
-                                scale_reward=REWARD_SCALE, policy_round=policy_round)
+        loss_v = calculate_loss(exp, state_net, policy_net, value_net, stats_dict, cuda=CUDA)
         if loss_v is None:
             continue
         loss_v.backward()
@@ -328,7 +321,6 @@ if __name__ == "__main__":
         if (idx+1) % SYNC_ITERS == 0:
             target_state_net.sync()
             target_policy_net.sync()
-            policy_round = random.choice([True, False])
 
         rewards = exp_source.pop_total_rewards()
         if rewards:

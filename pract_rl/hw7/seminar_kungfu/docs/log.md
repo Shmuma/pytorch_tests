@@ -69,4 +69,17 @@ Scaling slowed down convergence a lot. Looks like I need to tune hyperparams aga
 * Played with game parameters a bit
 
 Experiment:
-try to exchange policy learning with value-learning rounds.
+try to exchange policy learning with value-learning rounds -- result: zero
+
+Still don't understand why reward normalization breaks things. The best learning dynamics is for version 
+Oct09_16-03-49_gpu-lr=1e-5-batch=64-test-1
+
+Ok, roll back all changes to the state of Oct09_16-03-49_gpu-lr=1e-5-batch=64-test-1
+
+Rolled back changes:
+1. reward scale
+2. random policy or value rounds
+3. learning rate back to 1e-5
+4. entropy beta to 0.1
+
+Experience len left 20, warmup left 10, started
