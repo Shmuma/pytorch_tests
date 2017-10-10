@@ -82,4 +82,4 @@ Rolled back changes:
 3. learning rate back to 1e-5
 4. entropy beta to 0.1
 
-Experience len left 20, warmup left 10, started
+Experience len left 20, warmup left 10, sync iters left 100, started.

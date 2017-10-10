@@ -2,7 +2,6 @@
 import os
 import gym
 import ptan
-import random
 import argparse
 import itertools
 import collections
