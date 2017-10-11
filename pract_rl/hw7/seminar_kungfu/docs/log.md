@@ -83,3 +83,7 @@ Rolled back changes:
 4. entropy beta to 0.1
 
 Experience len left 20, warmup left 10, sync iters left 100, started.
+This version works better, but still not very stable.
+
+Next experiment is to have two different learning rates for policy and for value.
+Try POLICY_LR=1e-5, VALUE_LR=1e-4 
