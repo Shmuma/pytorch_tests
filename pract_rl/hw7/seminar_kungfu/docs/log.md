@@ -89,4 +89,7 @@ Next experiment is to have two different learning rates for policy and for value
 Try POLICY_LR=1e-5, VALUE_LR=1e-4 
 
 Result looks more stable, but performance slowed down, and speed of training decreased two times, so, roll back this 
-change with  
+change with 4ad46858205040c2b1fc81a18e1e96cea53996ea.
+  
+After discussion in ODS, have a thought about extra instability with large count of steps in n-step value estimation,
+so, decided to try to decrease count of steps from 4 to 1.
