@@ -19,8 +19,7 @@ log = gym.logger
 
 GAMES_COUNT = 10
 LSTM_SIZE = 512
-POLICY_LR = 0.0001
-VALUE_LR  = 0.001
+LEARNING_RATE = 0.0001
 GAMMA = 0.99
 VALUE_STEPS = 4
 EXPERIENCE_LEN = 20
@@ -179,14 +178,12 @@ def calculate_loss(exp, state_net, policy_net, value_net, stats_dict, cuda=False
 
     # observation ended prematurely
     if not rewards or all(map(lambda r: r is None, rewards)):
-        return None, None
+        return None
 
     # can calculate loss using precomputed approximation of total reward and our policies
-    p_loss_v = Variable(torch.FloatTensor([0]))
-    v_loss_v = Variable(torch.FloatTensor([0]))
+    loss_v = Variable(torch.FloatTensor([0]))
     if cuda:
-        p_loss_v = p_loss_v.cuda()
-        v_loss_v = v_loss_v.cuda()
+        loss_v = loss_v.cuda()
     for exp_item, total_reward, value_v, policy_idx in zip(reversed(exp), rewards, reversed(values),
                                                            range(len(policies)-1, -1, -1)):
         if total_reward is None:
@@ -203,17 +200,16 @@ def calculate_loss(exp, state_net, policy_net, value_net, stats_dict, cuda=False
         loss_policy_v = torch.mul(log_policy_v[exp_item.action], -advantage)
         # entropy loss
         loss_entropy_v = ENTROPY_BETA * torch.sum(policy_v * log_policy_v)
-        p_loss_v += loss_policy_v + loss_entropy_v
-        v_loss_v += loss_value_v
+        loss_v += loss_value_v + loss_policy_v + loss_entropy_v
         stats_dict['advantage'] += advantage
         stats_dict['reward_disc'] += total_reward
         stats_dict['loss_count'] += 1
         stats_dict['loss_value'] += loss_value_v.data.cpu().numpy()[0]
         stats_dict['loss_policy'] += loss_policy_v.data.cpu().numpy()[0]
         stats_dict['loss_entropy'] += loss_entropy_v.data.cpu().numpy()[0]
-        stats_dict['loss'] += (p_loss_v + v_loss_v).data.cpu().numpy()[0]
+        stats_dict['loss'] += loss_v.data.cpu().numpy()[0]
 
-    return p_loss_v, v_loss_v
+    return loss_v
 
 
 def report(writer, iter_idx, stats_dict):
@@ -274,7 +270,7 @@ def test_model(envs, agent):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("-n", "--name", default='two-opt', help="Name of the run, used as suffix for TB and saves dir")
+    parser.add_argument("-n", "--name", default='exp-len', help="Name of the run, used as suffix for TB and saves dir")
     args = parser.parse_args()
 
     saves_dir = os.path.join(SAVES_DIR, args.name)
@@ -288,9 +284,9 @@ if __name__ == "__main__":
     state_net = StateNet(env.observation_space.shape, LSTM_SIZE)
     value_net = ValueNet(LSTM_SIZE)
     policy_net = PolicyNet(LSTM_SIZE, env.action_space.n)
-    policy_optimizer = optim.RMSprop(itertools.chain(state_net.parameters(), value_net.parameters()), lr=POLICY_LR)
-    value_optimizer = optim.RMSprop(itertools.chain(state_net.parameters(), value_net.parameters()), lr=POLICY_LR)
-    writer = SummaryWriter(comment="-two-opt")
+    params = itertools.chain(state_net.parameters(), value_net.parameters(), policy_net.parameters())
+    optimizer = optim.RMSprop(params, lr=LEARNING_RATE)
+    writer = SummaryWriter(comment="-exp-len")
 
     target_state_net = ptan.agent.TargetNet(state_net)
     target_policy_net = ptan.agent.TargetNet(policy_net)
@@ -308,33 +304,18 @@ if __name__ == "__main__":
     test_envs = [make_env() for _ in range(TEST_GAMES)]
 
     best_test_reward = None
-    policy_loss_v = value_loss_v = None
 
     for idx, exp in enumerate(exp_source):
-        p_loss_v, v_loss_v = calculate_loss(exp, state_net, policy_net, value_net, stats_dict, cuda=CUDA)
-        if p_loss_v is None:
+        loss_v = calculate_loss(exp, state_net, policy_net, value_net, stats_dict, cuda=CUDA)
+        if loss_v is None:
             continue
-        if policy_loss_v is None:
-            policy_loss_v = p_loss_v
-            value_loss_v = v_loss_v
-        else:
-            policy_loss_v += p_loss_v
-            value_loss_v += v_loss_v
+        loss_v.backward()
         # perform update of gradients in batches. It's the same as do minibatches, but less parallel in GPU
         if (idx+1) % BATCH_ITERS == 0:
-            # value loss
-            value_loss_v.backward(retain_graph=True)
-            params = itertools.chain(state_net.parameters(), value_net.parameters())
+            params = itertools.chain(state_net.parameters(), value_net.parameters(), policy_net.parameters())
             nn.utils.clip_grad_norm(params, max_norm=100.0, norm_type=2)
-            value_optimizer.step()
-            value_optimizer.zero_grad()
-            # policy loss
-            policy_loss_v.backward()
-            params = itertools.chain(state_net.parameters(), policy_net.parameters())
-            nn.utils.clip_grad_norm(params, max_norm=100.0, norm_type=2)
-            policy_optimizer.step()
-            policy_optimizer.zero_grad()
-            policy_loss_v = value_loss_v = None
+            optimizer.step()
+            optimizer.zero_grad()
 
         if (idx+1) % SYNC_ITERS == 0:
             target_state_net.sync()
