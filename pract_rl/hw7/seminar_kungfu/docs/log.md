@@ -94,4 +94,5 @@ change with 4ad46858205040c2b1fc81a18e1e96cea53996ea.
 After discussion in ODS, have a thought about extra instability with large count of steps in n-step value estimation,
 so, decided to try to decrease count of steps from 4 to 1.
 
-With step=1 it doesn't improve, try 2.
+With step=1 it doesn't improve, try 2. Grows better, but still reward is not stable and noisy.
+Will try step=3.

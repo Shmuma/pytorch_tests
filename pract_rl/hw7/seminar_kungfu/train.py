@@ -21,7 +21,7 @@ GAMES_COUNT = 10
 LSTM_SIZE = 512
 LEARNING_RATE = 0.0001
 GAMMA = 0.99
-VALUE_STEPS = 2
+VALUE_STEPS = 3
 EXPERIENCE_LEN = 20
 STATE_WARMUP_LEN = 10
 
@@ -270,7 +270,7 @@ def test_model(envs, agent):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("-n", "--name", default='two-val-steps', help="Name of the run, used as suffix for TB and saves dir")
+    parser.add_argument("-n", "--name", default='three-val-steps', help="Name of the run, used as suffix for TB and saves dir")
     args = parser.parse_args()
 
     saves_dir = os.path.join(SAVES_DIR, args.name)
@@ -286,7 +286,7 @@ if __name__ == "__main__":
     policy_net = PolicyNet(LSTM_SIZE, env.action_space.n)
     params = itertools.chain(state_net.parameters(), value_net.parameters(), policy_net.parameters())
     optimizer = optim.RMSprop(params, lr=LEARNING_RATE)
-    writer = SummaryWriter(comment="-two-val-steps")
+    writer = SummaryWriter(comment="-three-val-steps")
 
     target_state_net = ptan.agent.TargetNet(state_net)
     target_policy_net = ptan.agent.TargetNet(policy_net)
